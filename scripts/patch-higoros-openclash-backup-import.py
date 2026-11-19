@@ -69,13 +69,13 @@ replacement = r'''function restore_backup(archive)
 	local tarok = SYS.call("tar tzf " .. quoted .. " >" .. listfile .. " 2>/dev/null") == 0
 	local has_profile, unsafe = false, false
 	local allowed, count = {}, 0
-	local links = SYS.call("tar tvzf " .. quoted .. " 2>/dev/null | grep -qE '^[lh]'") == 0
-	if tarok and not links then
+	local unsafe_types = SYS.call("tar tvzf " .. quoted .. " 2>/dev/null | grep -qE '^[bcp lhs]'") == 0
+	if tarok and not unsafe_types then
 		for line in io.lines(listfile) do
 			line = line:gsub("/$", "")
-			if line:match("^/") or line:find("/../", 1, true) or line:sub(-3) == "/.." then unsafe = true end
+			if line:match("^/") or line:match("^%.%./") or line:find("/../", 1, true) or line:sub(-3) == "/.." then unsafe = true end
 			local category, name = line:match("^%./([%w_%-]+)/([^/]+)$")
-			if name == "." or name == ".." then unsafe = true end
+			if name and not name:match("^[%w_.%-]+$") then unsafe = true end
 			local ok = line == "./openclash"
 				or (category == "config" and name and name:match("%.ya?ml$"))
 				or ((category == "custom" or category == "overwrite" or category == "proxy_provider" or category == "rule_provider") and name ~= nil)
@@ -89,7 +89,7 @@ replacement = r'''function restore_backup(archive)
 			end
 		end
 	end
-	if tarok and not links and has_profile and not unsafe then
+	if tarok and not unsafe_types and has_profile and not unsafe then
 		local allow = io.open(allowfile, "w")
 		if allow then
 			for _, path in ipairs(allowed) do allow:write(path, "\n") end
@@ -129,6 +129,10 @@ replacement = r'''function restore_backup(archive)
 						if SYS.call("test -f " .. UTIL.shellquote(src)) == 0 then
 							ok = ok and SYS.call("cp -f " .. UTIL.shellquote(src) .. " /etc/openclash/") == 0
 						end
+					end
+					local staged_uci = stage .. "/openclash"
+					if SYS.call("test -f " .. UTIL.shellquote(staged_uci) .. " && grep -qE \"^config[[:space:]]+openclash[[:space:]]+['\\\"]config['\\\"]\" " .. UTIL.shellquote(staged_uci)) == 0 then
+						ok = ok and SYS.call("cp -f " .. UTIL.shellquote(staged_uci) .. " /etc/config/openclash") == 0
 					end
 					ok = ok and SYS.call("uci set openclash.config.config_path=" .. UTIL.shellquote("/etc/openclash/config/" .. selected)) == 0
 					ok = ok and SYS.call("uci set openclash.config.enable=0 && uci set openclash.config.core_type=Meta && uci set openclash.config.interface_name=br-lan && uci set openclash.config.lan_interface_name=br-lan && uci set openclash.config.en_mode=fake-ip-tun && uci set openclash.config.smart_enable=0 && uci set openclash.config.auto_smart_switch=0 && uci set openclash.config.smart_enable_lgbm=0 && uci -q delete openclash.config.stack_type && uci commit openclash") == 0
