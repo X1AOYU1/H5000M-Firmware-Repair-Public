@@ -13,6 +13,7 @@ root="$(find "$OUT/tar" -type f -name root -print -quit)"
 unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
 
 python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openclash-node-cleanup.txt"
+python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
 
 # Apply the current login-page fix and revise every SPA asset URL afterward.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
@@ -32,6 +33,7 @@ network = next(assets.glob("NetworkPage-*.js")).read_text(encoding="utf-8")
 security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 openclash_page = next(assets.glob("OpenClashPage-*.js"))
+openclash_lua = (root / "usr/lib/lua/luci/openclash.lua").read_text(encoding="utf-8")
 package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
@@ -41,7 +43,8 @@ checks = {
     "Argon upload publication": 'new File([blob],aliasName' in native,
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
-    "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and "/cgi-bin/luci/admin/services/openclash" not in openclash_page.read_text(encoding="utf-8"),
+    "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and 'y("iframe"' not in openclash_page.read_text(encoding="utf-8"),
+    "filtered HigoOS backup upload": '导入 OpenClash 备份 (.tar.gz)' in openclash_page.read_text(encoding="utf-8") and '/cgi-bin/luci/admin/services/openclash/restore_backup' in openclash_page.read_text(encoding="utf-8") and 'local allowfile = "/tmp/oc_restore.allow"' in openclash_lua and 'core_type = "Meta"' in openclash_lua and 'enable = "0"' in openclash_lua,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
@@ -150,8 +153,9 @@ assert profile.get("proxies") == [] and profile.get("proxy-groups") == [] and pr
 configs = Path(sys.argv[2])
 assert not (configs / "dy.yaml").exists() and not (configs / "127.0.0.1.yaml").exists()
 openclash = next(Path(sys.argv[3]).glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
-assert len(openclash) > 1000 and "/cgi-bin/luci/admin/services/openclash" not in openclash
+assert len(openclash) > 1000 and 'y("iframe"' not in openclash
+assert '导入 OpenClash 备份 (.tar.gz)' in openclash
 PY
 sha256sum "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
 stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
-echo "PASS: complete H5000M repair features retained; original HigoOS OpenClash page preserved; requested profiles removed; empty starter config and upgrade metadata verified" | tee "$OUT/firmware-verification.txt"
+echo "PASS: complete H5000M repair features retained; original HigoOS OpenClash page and filtered backup import verified; requested profiles removed; upgrade metadata verified" | tee "$OUT/firmware-verification.txt"

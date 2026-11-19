@@ -47,6 +47,7 @@ jobs:
           python3 tests/higoros-login-wallpaper-patch.test.py
           node --input-type=module --check < scripts/higoos-wallpaper-crop.js
           python3 tests/openclash-cleanup.test.py
+          python3 tests/openclash-backup-import.test.py
           sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - uses: actions/upload-artifact@v4
         with:
@@ -59,6 +60,7 @@ jobs:
             output/metadata.json
             output/metadata-extracted.json
             output/login-wallpaper-fix.txt
+            output/openclash-backup-import.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
           retention-days: 30
@@ -69,9 +71,9 @@ jobs:
           name: H5000M complete repair, node-free
           body: >-
             Built from the complete repair baseline. The original HigoOS
-            OpenClash page and layout are preserved; proxy nodes and subscription
-            credentials were removed. Other firmware repairs and H5000M upgrade
-            metadata were verified.
+            OpenClash page and layout are preserved with filtered backup import;
+            proxy nodes and subscription credentials were removed. Other
+            firmware repairs and H5000M upgrade metadata were verified.
             Automated validation does not replace testing on a physical H5000M.
           prerelease: true
           make_latest: false
