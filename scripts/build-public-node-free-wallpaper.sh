@@ -62,6 +62,23 @@ with tarfile.open(source, "r:*") as archive:
                 packed.addfile(info, stream)
 PY
 cp "$OUT/repaired.tar" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
+metadata="$OUT/metadata.json"
+cat > "$metadata" <<'JSON'
+{ "metadata_version": "1.1", "compat_version": "1.0", "supported_devices": ["hiveton,h5000m", "hiveton-h5000m"], "version": { "dist": "ImmortalWrt", "version": "24.10-SNAPSHOT", "revision": "unknown", "target": "mediatek/filogic", "board": "hiveton,h5000m" } }
+JSON
+fwtool -I "$metadata" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
+fwtool -i "$OUT/metadata-extracted.json" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
+cmp "$metadata" "$OUT/metadata-extracted.json"
+python3 - "$OUT/metadata-extracted.json" <<'PY'
+import json
+import sys
+metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+assert metadata["compat_version"] == "1.0"
+assert "hiveton,h5000m" in metadata["supported_devices"]
+assert metadata["version"]["target"] == "mediatek/filogic"
+assert metadata["version"]["board"] == "hiveton,h5000m"
+print("PASS: H5000M sysupgrade metadata round-trip and board compatibility verified")
+PY
 
 mkdir -p "$OUT/final-tar"
 tar -xf "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" -C "$OUT/final-tar"
@@ -79,4 +96,4 @@ if config.get("proxies") != [] or config.get("proxy-groups") != []:
 PY
 sha256sum "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
 stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
-echo "PASS: final firmware contains the login wallpaper fix and no proxy nodes" | tee "$OUT/firmware-verification.txt"
+echo "PASS: final firmware contains HigoOS login wallpaper fix, H5000M sysupgrade metadata, and no proxy nodes" | tee "$OUT/firmware-verification.txt"

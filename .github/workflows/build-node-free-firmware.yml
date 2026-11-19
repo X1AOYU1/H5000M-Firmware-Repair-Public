@@ -19,7 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install image tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends squashfs-tools xz-utils tar python3-yaml
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends squashfs-tools xz-utils tar python3-yaml cmake build-essential git
+      - name: Build fwtool
+        run: |
+          git clone --depth 1 https://git.openwrt.org/project/fwtool.git /tmp/fwtool-src
+          cmake -S /tmp/fwtool-src -B /tmp/fwtool-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/fwtool-build --parallel 2
+          sudo install -m 0755 /tmp/fwtool-build/fwtool /usr/local/bin/fwtool
       - name: Download node-free baseline
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,6 +51,8 @@ jobs:
             output/SHA256SUMS.txt
             output/firmware-size.txt
             output/firmware-verification.txt
+            output/metadata.json
+            output/metadata-extracted.json
             output/login-wallpaper-fix.txt
             output/frontend-asset-revision.txt
           retention-days: 30
