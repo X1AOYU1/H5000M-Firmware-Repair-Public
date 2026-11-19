@@ -34,7 +34,8 @@ print("PASS: HigoOS OpenClash route embeds the native LuCI interface in a respon
 
 app_path = app_pages[0]
 app_source = app_path.read_text(encoding="utf-8")
-openclash_url = 'a.value?.luciUrl?.endsWith("/services/openclash")?"/apps/openclash":x(a.value)'
+is_openclash = 'a.value?.luciUrl?.toLowerCase().includes("/services/openclash")'
+openclash_url = f'{is_openclash}?"/apps/openclash":x(a.value)'
 resolver_anchor = 's=l(()=>x(a.value))'
 resolver_replacement = f's=l(()=>{openclash_url})'
 if app_source.count(resolver_anchor) == 1:
@@ -43,7 +44,7 @@ elif resolver_replacement not in app_source:
     raise SystemExit("ERROR: HigoOS LuCI app link resolver changed")
 
 link_anchor = 'href:s.value,target:"_blank",rel:"noopener"'
-link_replacement = 'href:s.value,target:a.value?.luciUrl?.endsWith("/services/openclash")?"_self":"_blank",rel:"noopener"'
+link_replacement = f'href:s.value,target:{is_openclash}?"_self":"_blank",rel:"noopener"'
 if app_source.count(link_anchor) == 1:
     app_source = app_source.replace(link_anchor, link_replacement, 1)
 elif link_replacement not in app_source:
