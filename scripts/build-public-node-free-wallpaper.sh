@@ -33,12 +33,13 @@ network = next(assets.glob("NetworkPage-*.js")).read_text(encoding="utf-8")
 security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 package = next((assets.glob("PackagesPage-*.js")), None)
+crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
     "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
-    "wallpaper crop module is imported": 'import{mountHigoosWallpaperCrop}from"./higoos-wallpaper-crop.js";' in native and (assets / "higoos-wallpaper-crop.js").is_file(),
-    "wallpaper crop controls and upload": all(value in (assets / "higoos-wallpaper-crop.js").read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
+    "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
+    "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "native LuCI OpenClash embed": 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"),
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
