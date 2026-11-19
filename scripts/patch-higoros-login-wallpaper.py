@@ -106,7 +106,8 @@ upload_anchor = 'try{await l.mutateAsync({file:u.value,revision:c?.revision||s.d
 upload_replacement = (
     'try{const uploadedName=u.value.name;await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision});'
     'try{if(/\\.(?:jpe?g|png|gif|webp)$/i.test(uploadedName))localStorage.setItem('
-    '"higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName))}catch{}'
+    '"higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName));'
+    'localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
     'u.value=null'
 )
 if native.count(upload_anchor) == 1:

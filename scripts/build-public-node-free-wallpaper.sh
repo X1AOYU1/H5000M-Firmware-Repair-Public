@@ -79,6 +79,7 @@ PY
 
 # Apply the current login-page fix and revise every SPA asset URL afterward.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
+python3 scripts/patch-higoros-openclash-luci-link.py "$OUT/rootfs" | tee "$OUT/openclash-luci-link.txt"
 python3 scripts/revision-higoros-web-assets.py "$OUT/rootfs" | tee "$OUT/frontend-asset-revision.txt"
 
 python3 - "$OUT/rootfs" <<'PY'
@@ -97,7 +98,9 @@ next(assets.glob("SystemPage-*.js"))
 package = next((assets.glob("PackagesPage-*.js")), None)
 checks = {
     "login wallpaper": "higoos-login-wallpaper." in login and "wallpaper.value?{backgroundImage:" in login,
+    "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
+    "native LuCI OpenClash link": 'href:"/cgi-bin/luci/admin/services/openclash"' in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"),
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),

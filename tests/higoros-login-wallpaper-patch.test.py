@@ -44,6 +44,7 @@ with tempfile.TemporaryDirectory() as temporary:
     )
     required_native = (
         'localStorage.setItem(key,prefix+encodeURIComponent(selected.name))',
+        'localStorage.removeItem("higoos_argon_login_wallpaper_source")',
         'encodeURIComponent(uploadedName)',
         'localStorage.removeItem(key)',
         r'/\.(?:jpe?g|png|gif|webp)$/i',
@@ -58,3 +59,22 @@ with tempfile.TemporaryDirectory() as temporary:
     if any(marker not in native_source for marker in required_native):
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
 print("PASS: existing and new Argon uploads publish a stable login wallpaper independent of browser storage")
+
+with tempfile.TemporaryDirectory() as temporary:
+    root = Path(temporary)
+    assets = root / "usr/share/higoros/web/assets"
+    assets.mkdir(parents=True)
+    (assets / "OpenClashPage-fixture.js").write_text(
+        's("div",bl,[m(i(p),{variant:"secondary",disabled:t.value||!v.value',
+        encoding="utf-8",
+    )
+    controller = root / "usr/lib/lua/luci/controller/openclash.lua"
+    controller.parent.mkdir(parents=True)
+    controller.write_text("-- fixture", encoding="utf-8")
+    (root / "usr/lib/lua/luci/view/openclash").mkdir(parents=True)
+    subprocess.run(
+        [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
+        check=True,
+    )
+    if 'href:"/cgi-bin/luci/admin/services/openclash"' not in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"):
+        raise SystemExit("ERROR: native LuCI OpenClash shortcut is missing")
