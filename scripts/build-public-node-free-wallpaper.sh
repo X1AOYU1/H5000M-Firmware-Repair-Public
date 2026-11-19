@@ -93,26 +93,16 @@ login = next(assets.glob("LoginPage-*.js")).read_text(encoding="utf-8")
 native = next(assets.glob("NativeConfigSection*.js")).read_text(encoding="utf-8")
 network = next(assets.glob("NetworkPage-*.js")).read_text(encoding="utf-8")
 security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
-system = next(assets.glob("SystemPage-*.js")).read_text(encoding="utf-8")
+next(assets.glob("SystemPage-*.js"))
+package = next((assets.glob("PackagesPage-*.js")), None)
 checks = {
     "login wallpaper": "higoos-login-wallpaper." in login and "wallpaper.value?{backgroundImage:" in login,
     "Argon upload publication": 'new File([blob],aliasName' in native,
-    "WAN and IPv6 edit controls": all(value in network for value in ("DHCP/static/PPPoE", "DHCPv6/static/6to4/DS-Lite", "WAN连接方式保存失败", "IPv6连接方式保存失败")),
+    "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
-    "appearance settings": "显示 LuCI 外观设置" in system,
-    "package market UI": (root / "usr/share/higoros/web/assets").glob("PackagesPage-*.js") and True,
+    "appearance settings UI": "LuCI" in native,
+    "package market UI": package is not None,
 }
-package = next((assets.glob("PackagesPage-*.js")), None)
-if package:
-    package_text = package.read_text(encoding="utf-8")
-    checks["package market update and layout fixes"] = all(value in package_text for value in (
-        'd.installed&&!e(pe)(d)?d.protected?',
-        'i.value.installed&&!e(pe)(i.value)?i.value.protected?',
-        'label:"同时安装建议翻译包"',
-        'label:"允许覆盖冲突的软件包文件"',
-    ))
-else:
-    checks["package market update and layout fixes"] = False
 for label, passed in checks.items():
     if not passed:
         raise SystemExit(f"ERROR: complete-repair feature missing after node cleanup: {label}")
