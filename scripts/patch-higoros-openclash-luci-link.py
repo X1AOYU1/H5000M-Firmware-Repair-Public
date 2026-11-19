@@ -34,26 +34,36 @@ print("PASS: HigoOS OpenClash route embeds the native LuCI interface in a respon
 
 app_path = app_pages[0]
 app_source = app_path.read_text(encoding="utf-8")
-is_openclash = 'JSON.stringify(a.value||{}).toLowerCase().includes("openclash")'
-openclash_url = f'{is_openclash}?"/apps/openclash":x(a.value)'
-resolver_anchor = 's=l(()=>x(a.value))'
-resolver_replacement = f's=l(()=>{openclash_url})'
-if app_source.count(resolver_anchor) == 1:
-    app_source = app_source.replace(resolver_anchor, resolver_replacement, 1)
-elif resolver_replacement not in app_source:
-    raise SystemExit("ERROR: HigoOS LuCI app link resolver changed")
-
-link_anchor = 'href:s.value,target:"_blank",rel:"noopener"'
-link_replacement = (
-    f'href:s.value,target:{is_openclash}?"_self":"_blank",'
-    f'onClick:e=>{{if({is_openclash}){{e.preventDefault();window.location.assign("/apps/openclash")}}}},'
-    'rel:"noopener"'
+overlay_handler = (
+    '(()=>{if(window.__higoosOpenClashFrame)return;'
+    'window.__higoosOpenClashFrame=true;'
+    'document.addEventListener("click",e=>{'
+    'const t=e.target instanceof Element?e.target:null;'
+    'const control=t&&t.closest("a,button");if(!control)return;'
+    'let card=control,matched=false;'
+    'for(let i=0;card&&i<8;i++,card=card.parentElement){'
+    'const text=(card.innerText||card.textContent||"").toLowerCase();'
+    'if(text.includes("openclash")&&text.includes("打开")){matched=true;break}}'
+    'if(!matched)return;e.preventDefault();e.stopImmediatePropagation();'
+    'if(document.getElementById("higoos-openclash-frame"))return;'
+    'const overlay=document.createElement("div");overlay.id="higoos-openclash-frame";'
+    'Object.assign(overlay.style,{position:"fixed",inset:"0",zIndex:"2147483000",'
+    'background:"#f3f5f8",display:"flex",flexDirection:"column"});'
+    'const bar=document.createElement("div");Object.assign(bar.style,{height:"48px",'
+    'flex:"0 0 48px",display:"flex",alignItems:"center",justifyContent:"space-between",'
+    'padding:"0 16px",background:"#fff",borderBottom:"1px solid #d9dee8",font:"14px sans-serif"});'
+    'const title=document.createElement("strong");title.textContent="OpenClash";'
+    'const close=document.createElement("button");close.type="button";close.textContent="关闭";'
+    'Object.assign(close.style,{padding:"6px 12px",cursor:"pointer"});'
+    'close.addEventListener("click",()=>overlay.remove());bar.append(title,close);'
+    'const frame=document.createElement("iframe");frame.title="LuCI OpenClash";'
+    'frame.src="/cgi-bin/luci/admin/services/openclash";'
+    'Object.assign(frame.style,{width:"100%",height:"calc(100% - 48px)",flex:"1",border:"0",background:"#fff"});'
+    'overlay.append(bar,frame);document.body.append(overlay)},true)})();'
 )
-if app_source.count(link_anchor) == 1:
-    app_source = app_source.replace(link_anchor, link_replacement, 1)
-elif link_replacement not in app_source:
-    raise SystemExit("ERROR: HigoOS LuCI app link target changed")
+if "window.__higoosOpenClashFrame" not in app_source:
+    app_source += overlay_handler
 app_path.write_text(app_source, encoding="utf-8")
-if openclash_url not in app_source or link_replacement not in app_source:
-    raise SystemExit("ERROR: OpenClash app center shortcut does not open the embedded HigoOS route")
-print("PASS: OpenClash app center button opens the HigoOS embedded OpenClash route")
+if 'document.addEventListener("click"' not in app_source or 'frame.src="/cgi-bin/luci/admin/services/openclash"' not in app_source:
+    raise SystemExit("ERROR: OpenClash app center button does not open the embedded LuCI interface")
+print("PASS: OpenClash app center clicks open native LuCI in an in-shell overlay")

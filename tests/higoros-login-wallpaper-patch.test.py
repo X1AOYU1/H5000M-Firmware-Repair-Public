@@ -120,12 +120,12 @@ with tempfile.TemporaryDirectory() as temporary:
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
     app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
-    if 's=l(()=>JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"/apps/openclash":x(a.value))' not in app:
-        raise SystemExit("ERROR: OpenClash app shortcut does not resolve to the HigoOS route")
-    if 'href:s.value,target:JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"_self":"_blank"' not in app:
-        raise SystemExit("ERROR: OpenClash app shortcut does not open in the HigoOS shell")
-    if 'e.preventDefault();window.location.assign("/apps/openclash")' not in app:
-        raise SystemExit("ERROR: OpenClash launcher has no explicit same-page navigation handler")
+    if 'document.addEventListener("click"' not in app:
+        raise SystemExit("ERROR: OpenClash app shortcut has no delegated click handler")
+    if 'frame.src="/cgi-bin/luci/admin/services/openclash"' not in app:
+        raise SystemExit("ERROR: OpenClash app shortcut does not open native LuCI in the HigoOS shell")
+    if 'close.addEventListener("click",()=>overlay.remove())' not in app:
+        raise SystemExit("ERROR: OpenClash embedded overlay has no close control")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
