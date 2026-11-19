@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'const ue={setup(){const p=M(),x=$(),_=N(),d=a("root"),c=a(""),b=a(!1),f=a(!1),s=a(""),m=a(!1),g=a("--");'
         'F(()=>{x.query.expired==="1"&&(m.value=!0,s.value="会话已过期，请重新登录"),'
         'x.query.changed==="1"&&(m.value=!1,s.value="密码已修改，请使用新密码登录"),H()});'
-        'return i("div",Y,[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}))])}}',
+        'return i("div",Y,[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"})),e("div",{class:"w-full rounded-xl bg-white shadow-lg"},[])])}}',
         encoding="utf-8",
     )
     native = assets / "NativeConfigSection-fixture.js"
@@ -46,6 +46,8 @@ with tempfile.TemporaryDirectory() as temporary:
         'wallpaper.value?{backgroundImage:',
         'backgroundSize:"cover"',
         'wallpaper.value?i("img",{src:wallpaper.value',
+        'backgroundColor:"rgba(255,255,255,.84)"',
+        'backdropFilter:"blur(12px)"',
     )
     required_native = (
         'localStorage.setItem(key,prefix+encodeURIComponent(selected.name))',

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Apply uploaded Argon image backgrounds to the HigoOS SPA login page."""
 from pathlib import Path
+import re
 import sys
 
 
@@ -67,6 +68,23 @@ if login.count(image_anchor) == 1:
 elif 'wallpaper.value?i("img",{src:wallpaper.value' not in login:
     raise SystemExit("ERROR: HigoOS login background image insertion point changed")
 login_path.write_text(login, encoding="utf-8")
+
+# Keep the login form readable while allowing the uploaded image to show
+# through its white card as a restrained frosted-glass surface.
+card_marker = 'backgroundColor:"rgba(255,255,255,.84)",backdropFilter:"blur(12px)"'
+if card_marker not in login:
+    card_pattern = re.compile(r'e\("div",\{class:"(?=[^"]*\bbg-white\b)(?=[^"]*\brounded[^ ]*)(?=[^"]*\bshadow[^ ]*)[^"]*"')
+    login, card_count = card_pattern.subn(
+        lambda match: match.group(0)[:-1]
+        + ',style:wallpaper.value?{backgroundColor:"rgba(255,255,255,.84)",'
+        + 'backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",'
+        + 'border:"1px solid rgba(255,255,255,.5)"}:void 0',
+        login,
+        count=1,
+    )
+    if card_count != 1:
+        raise SystemExit("ERROR: HigoOS login form card style anchor changed")
+    login_path.write_text(login, encoding="utf-8")
 
 native_path = native_pages[0]
 native = native_path.read_text(encoding="utf-8")
@@ -179,6 +197,7 @@ native_path.write_text(native, encoding="utf-8")
 
 for marker, content in (
     ("new Image()", login),
+    ('backgroundColor:"rgba(255,255,255,.84)"', login),
     ("higoos-login-wallpaper.", login),
     ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),
