@@ -53,7 +53,7 @@ jobs:
           TZ: Asia/Shanghai
         run: |
           python3 tests/higoros-login-wallpaper-patch.test.py
-          node --check scripts/higoos-wallpaper-crop.js
+          node --input-type=module --check < scripts/higoos-wallpaper-crop.js
           python3 tests/openclash-cleanup.test.py
           sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - uses: actions/upload-artifact@v4
