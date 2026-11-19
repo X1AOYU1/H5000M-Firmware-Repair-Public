@@ -123,21 +123,18 @@ with tempfile.TemporaryDirectory() as temporary:
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
     app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
-    launcher = (assets / "higoos-openclash-launcher.js").read_text(encoding="utf-8")
-    if 'document.addEventListener("click"' not in launcher:
-        raise SystemExit("ERROR: OpenClash launcher module has no delegated click handler")
-    if 'f.src="/cgi-bin/luci/admin/services/openclash"' not in launcher:
-        raise SystemExit("ERROR: OpenClash app shortcut does not open native LuCI in the HigoOS shell")
-    if 'x.addEventListener("click",()=>o.remove())' not in launcher:
-        raise SystemExit("ERROR: OpenClash embedded overlay has no close control")
+    if '"/apps/openclash"' not in app:
+        raise SystemExit("ERROR: OpenClash app shortcut does not resolve to the HigoOS route")
+    if 'target:JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"_self":"_blank"' not in app:
+        raise SystemExit("ERROR: OpenClash route must stay in the HigoOS browser window")
     index = (root / "usr/share/higoros/web/index.html").read_text(encoding="utf-8")
     if '<base href="/">' not in index:
         raise SystemExit("ERROR: HigoOS index does not resolve assets from nested routes")
-    if '<script defer src="/assets/higoos-openclash-launcher.js"></script>' not in index:
-        raise SystemExit("ERROR: global OpenClash launcher is not loaded by HigoOS")
+    if "higoos-openclash-launcher" in index:
+        raise SystemExit("ERROR: obsolete full-screen OpenClash overlay is still loaded")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
     )
-    if next(assets.glob("higoos-openclash-launcher.js")).read_text(encoding="utf-8") != launcher:
-        raise SystemExit("ERROR: OpenClash shortcut patch is not idempotent")
+    if next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8") != app:
+        raise SystemExit("ERROR: OpenClash route patch is not idempotent")

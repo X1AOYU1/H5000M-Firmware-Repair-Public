@@ -23,7 +23,7 @@ pages[0].write_text(
     'const OpenClashNativeFrame=el({name:"OpenClashNativeFrame",setup(){'
     'return()=> (o(),y("iframe",{src:"/cgi-bin/luci/admin/services/openclash",'
     'title:"LuCI OpenClash",class:"w-full min-w-0 border-0 bg-white",'
-    'style:"height:calc(100vh - 8rem);min-height:720px",loading:"eager",'
+    'style:"height:calc(100vh - 12rem);min-height:640px",loading:"eager",'
     'referrerpolicy:"same-origin"}))}});export{OpenClashNativeFrame as default};\n',
     encoding="utf-8",
 )
@@ -33,54 +33,37 @@ if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in source:
 print("PASS: HigoOS OpenClash route embeds the native LuCI interface in a responsive iframe")
 
 app_path = app_pages[0]
-launcher = assets / "higoos-openclash-launcher.js"
-launcher_source = (
-    '(()=>{if(window.__higoosOpenClashLauncher)return;'
-    'window.__higoosOpenClashLauncher=true;'
-    'document.addEventListener("click",e=>{'
-    'const t=e.target instanceof Element?e.target:null;'
-    'const c=t&&t.closest("a,button");if(!c)return;'
-    'let matched=(c.getAttribute("href")||"").toLowerCase().includes("openclash");'
-    'if(!matched){let n=c;for(let i=0;n&&i<5;i++,n=n.parentElement){'
-    'const s=(n.innerText||n.textContent||"").toLowerCase();'
-    'if(s.includes("openclash")&&s.includes("打开")){matched=true;break}}}'
-    'if(!matched)return;e.preventDefault();e.stopImmediatePropagation();'
-    'if(document.getElementById("higoos-openclash-frame"))return;'
-    'const o=document.createElement("div");o.id="higoos-openclash-frame";'
-    'Object.assign(o.style,{position:"fixed",inset:"0",zIndex:"2147483000",'
-    'background:"#f3f5f8",display:"flex",flexDirection:"column"});'
-    'const b=document.createElement("div");Object.assign(b.style,{height:"48px",flex:"0 0 48px",'
-    'display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",'
-    'background:"#fff",borderBottom:"1px solid #d9dee8",font:"14px sans-serif"});'
-    'const h=document.createElement("strong");h.textContent="OpenClash";'
-    'const x=document.createElement("button");x.type="button";x.textContent="关闭";'
-    'Object.assign(x.style,{padding:"6px 12px",cursor:"pointer"});'
-    'x.addEventListener("click",()=>o.remove());b.append(h,x);'
-    'const f=document.createElement("iframe");f.title="LuCI OpenClash";'
-    'f.src="/cgi-bin/luci/admin/services/openclash";'
-    'Object.assign(f.style,{width:"100%",height:"calc(100% - 48px)",flex:"1",border:"0",background:"#fff"});'
-    'o.append(b,f);document.body.append(o)},true)})();\n'
-)
-existing = launcher.read_text(encoding="utf-8") if launcher.exists() else None
-if existing not in (None, launcher_source):
-    raise SystemExit("ERROR: unexpected HigoOS OpenClash launcher asset")
-launcher.write_text(launcher_source, encoding="utf-8")
+app_source = app_path.read_text(encoding="utf-8")
+is_openclash = 'JSON.stringify(a.value||{}).toLowerCase().includes("openclash")'
+route = f'{is_openclash}?"/apps/openclash":x(a.value)'
+resolver_anchor = 's=l(()=>x(a.value))'
+resolver_replacement = f's=l(()=>{route})'
+if app_source.count(resolver_anchor) == 1:
+    app_source = app_source.replace(resolver_anchor, resolver_replacement, 1)
+elif resolver_replacement not in app_source:
+    raise SystemExit("ERROR: HigoOS LuCI app link resolver changed")
+
+link_anchor = 'href:s.value,target:"_blank",rel:"noopener"'
+link_replacement = f'href:s.value,target:{is_openclash}?"_self":"_blank",rel:"noopener"'
+if app_source.count(link_anchor) == 1:
+    app_source = app_source.replace(link_anchor, link_replacement, 1)
+elif link_replacement not in app_source:
+    raise SystemExit("ERROR: HigoOS LuCI app link target changed")
+app_path.write_text(app_source, encoding="utf-8")
 
 index = root / "usr/share/higoros/web/index.html"
 if not index.is_file():
     raise SystemExit("ERROR: HigoOS web entry index.html is missing")
 html = index.read_text(encoding="utf-8")
-script_tag = '<script defer src="/assets/higoos-openclash-launcher.js"></script>'
 base_tag = '<base href="/">'
+index_changed = False
 if base_tag not in html:
     if html.count("</head>") != 1:
         raise SystemExit("ERROR: HigoOS index head marker is missing or ambiguous")
     html = html.replace("</head>", base_tag + "</head>", 1)
-if script_tag not in html:
-    if html.count("</body>") != 1:
-        raise SystemExit("ERROR: HigoOS index body marker is missing or ambiguous")
-    html = html.replace("</body>", script_tag + "</body>", 1)
+    index_changed = True
+if index_changed:
     index.write_text(html, encoding="utf-8")
-if base_tag not in html or script_tag not in html or 'f.src="/cgi-bin/luci/admin/services/openclash"' not in launcher_source:
-    raise SystemExit("ERROR: global OpenClash click launcher was not installed")
-print("PASS: global HigoOS click handler opens native LuCI in an in-shell overlay")
+if base_tag not in html or route not in app_source or link_replacement not in app_source:
+    raise SystemExit("ERROR: OpenClash card does not route to the HigoOS embedded page")
+print("PASS: OpenClash card opens its embedded page within the HigoOS layout")
