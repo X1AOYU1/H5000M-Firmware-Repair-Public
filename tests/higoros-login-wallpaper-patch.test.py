@@ -104,6 +104,9 @@ with tempfile.TemporaryDirectory() as temporary:
         's=l(()=>x(a.value));href:s.value,target:"_blank",rel:"noopener"',
         encoding="utf-8",
     )
+    (root / "usr/share/higoros/web/index.html").write_text(
+        '<html><body><div id="app"></div></body></html>', encoding="utf-8"
+    )
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
     controller.parent.mkdir(parents=True)
     controller.write_text("-- fixture", encoding="utf-8")
@@ -120,15 +123,19 @@ with tempfile.TemporaryDirectory() as temporary:
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
     app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
-    if 'document.addEventListener("click"' not in app:
-        raise SystemExit("ERROR: OpenClash app shortcut has no delegated click handler")
-    if 'frame.src="/cgi-bin/luci/admin/services/openclash"' not in app:
+    launcher = (assets / "higoos-openclash-launcher.js").read_text(encoding="utf-8")
+    if 'document.addEventListener("click"' not in launcher:
+        raise SystemExit("ERROR: OpenClash launcher module has no delegated click handler")
+    if 'f.src="/cgi-bin/luci/admin/services/openclash"' not in launcher:
         raise SystemExit("ERROR: OpenClash app shortcut does not open native LuCI in the HigoOS shell")
-    if 'close.addEventListener("click",()=>overlay.remove())' not in app:
+    if 'x.addEventListener("click",()=>o.remove())' not in launcher:
         raise SystemExit("ERROR: OpenClash embedded overlay has no close control")
+    index = (root / "usr/share/higoros/web/index.html").read_text(encoding="utf-8")
+    if '<script defer src="./assets/higoos-openclash-launcher.js"></script>' not in index:
+        raise SystemExit("ERROR: global OpenClash launcher is not loaded by HigoOS")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
     )
-    if next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8") != app:
+    if next(assets.glob("higoos-openclash-launcher.js")).read_text(encoding="utf-8") != launcher:
         raise SystemExit("ERROR: OpenClash shortcut patch is not idempotent")
