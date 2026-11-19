@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expose the installed OpenWrt LuCI OpenClash page from HigoOS."""
+"""Embed the packaged native LuCI OpenClash page inside HigoOS."""
 from pathlib import Path
 import sys
 
@@ -9,25 +9,22 @@ assets = root / "usr/share/higoros/web/assets"
 pages = sorted(assets.glob("OpenClashPage-*.js"))
 controller = root / "usr/lib/lua/luci/controller/openclash.lua"
 views = root / "usr/lib/lua/luci/view/openclash"
+styles = root / "www/luci-static/resources/openclash/css"
 if len(pages) != 1 or not controller.is_file() or not views.is_dir():
     raise SystemExit("ERROR: the packaged native LuCI OpenClash page is missing")
+if not (styles / "oc-client.css").is_file() or not (styles / "oc-common.css").is_file():
+    raise SystemExit("ERROR: native LuCI OpenClash stylesheets are missing")
 
-path = pages[0]
-source = path.read_text(encoding="utf-8")
-anchor = 's("div",bl,[m(i(p),{variant:"secondary",disabled:t.value||!v.value'
-link = (
-    's("div",bl,[s("a",{href:"/cgi-bin/luci/admin/services/openclash",target:"_blank",'
-    'rel:"noopener",class:"inline-flex items-center justify-center rounded-lg border '
-    'border-line-1/70 bg-bg-1 px-3 py-2 text-sm text-txt-1 hover:bg-bg-2 focus-visible:outline-none '
-    'focus-visible:ring-2 focus-visible:ring-brand"},"原生 LuCI OpenClash"),m(i(p),'
-    '{variant:"secondary",disabled:t.value||!v.value'
+pages[0].write_text(
+    'import{e as el,o,c as y}from"./vendor-taoyvcnH.js";'
+    'const OpenClashNativeFrame=el({name:"OpenClashNativeFrame",setup(){'
+    'return()=> (o(),y("iframe",{src:"/cgi-bin/luci/admin/services/openclash",'
+    'title:"LuCI OpenClash",class:"w-full min-w-0 border-0 bg-white",'
+    'style:"height:calc(100vh - 8rem);min-height:720px",loading:"eager",'
+    'referrerpolicy:"same-origin"}))}});export{OpenClashNativeFrame as default};\n',
+    encoding="utf-8",
 )
-if source.count(anchor) == 1:
-    source = source.replace(anchor, link, 1)
-elif 'href:"/cgi-bin/luci/admin/services/openclash"' not in source:
-    raise SystemExit("ERROR: HigoOS OpenClash action bar changed")
-
-path.write_text(source, encoding="utf-8")
-if 'href:"/cgi-bin/luci/admin/services/openclash"' not in source or '原生 LuCI OpenClash' not in source:
-    raise SystemExit("ERROR: native LuCI OpenClash link was not installed")
-print("PASS: HigoOS OpenClash page links to the installed native LuCI OpenClash interface")
+source = pages[0].read_text(encoding="utf-8")
+if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in source:
+    raise SystemExit("ERROR: OpenClash route does not embed native LuCI")
+print("PASS: HigoOS OpenClash route embeds the native LuCI interface in a responsive iframe")

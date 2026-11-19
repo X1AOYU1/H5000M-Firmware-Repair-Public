@@ -45,6 +45,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'higoos-login-wallpaper.',
         'wallpaper.value?{backgroundImage:',
         'backgroundSize:"cover"',
+        'wallpaper.value?i("img",{src:wallpaper.value',
     )
     required_native = (
         'localStorage.setItem(key,prefix+encodeURIComponent(selected.name))',
@@ -64,6 +65,9 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
     if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 1:
         raise SystemExit("ERROR: repeated patching duplicated or skipped the upload cache reset")
+    upload_handler = native_source[native_source.index('const uploadedName=u.value.name;'):]
+    if upload_handler.index('localStorage.removeItem("higoos_argon_login_wallpaper_source")') > upload_handler.index('await l.mutateAsync({file:u.value'):
+        raise SystemExit("ERROR: upload cache reset occurs after the file list update")
 print("PASS: existing and new Argon uploads publish a stable login wallpaper independent of browser storage")
 
 with tempfile.TemporaryDirectory() as temporary:
@@ -78,9 +82,14 @@ with tempfile.TemporaryDirectory() as temporary:
     controller.parent.mkdir(parents=True)
     controller.write_text("-- fixture", encoding="utf-8")
     (root / "usr/lib/lua/luci/view/openclash").mkdir(parents=True)
+    styles = root / "www/luci-static/resources/openclash/css"
+    styles.mkdir(parents=True)
+    (styles / "oc-client.css").write_text("", encoding="utf-8")
+    (styles / "oc-common.css").write_text("", encoding="utf-8")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
     )
-    if 'href:"/cgi-bin/luci/admin/services/openclash"' not in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"):
-        raise SystemExit("ERROR: native LuCI OpenClash shortcut is missing")
+    page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
+    if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
+        raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")

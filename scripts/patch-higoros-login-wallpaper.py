@@ -57,6 +57,15 @@ if login.count(root_anchor) == 1:
     login = login.replace(root_anchor, root_replacement, 1)
 elif 'wallpaper.value?{backgroundImage:' not in login:
     raise SystemExit("ERROR: HigoOS login root element changed")
+image_anchor = ',[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
+image_replacement = (
+    ',[wallpaper.value?i("img",{src:wallpaper.value,alt:"",class:"absolute inset-0 h-full w-full '
+    'object-cover pointer-events-none"},null,8,["src"]):z("",!0),t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
+)
+if login.count(image_anchor) == 1:
+    login = login.replace(image_anchor, image_replacement, 1)
+elif 'wallpaper.value?i("img",{src:wallpaper.value' not in login:
+    raise SystemExit("ERROR: HigoOS login background image insertion point changed")
 login_path.write_text(login, encoding="utf-8")
 
 native_path = native_pages[0]
@@ -104,16 +113,27 @@ else:
 
 upload_anchor = 'try{await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision}),u.value=null'
 upload_replacement = (
-    'try{const uploadedName=u.value.name;await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision});'
+    'try{const uploadedName=u.value.name;try{localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
+    'await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision});'
     'try{if(/\\.(?:jpe?g|png|gif|webp)$/i.test(uploadedName))localStorage.setItem('
     '"higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName));'
-    'localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
     'u.value=null'
 )
 if native.count(upload_anchor) == 1:
     native = native.replace(upload_anchor, upload_replacement, 1)
-elif 'const uploadedName=u.value.name;await l.mutateAsync' not in native:
+elif 'const uploadedName=u.value.name;' not in native:
     raise SystemExit("ERROR: Argon background upload success handler changed")
+cache_reset = 'localStorage.removeItem("higoos_argon_login_wallpaper_source")'
+handler_start = native.find('const uploadedName=u.value.name;')
+mutate_at = native.find('await l.mutateAsync({file:u.value', handler_start)
+reset_at = native.find(cache_reset, handler_start)
+if handler_start < 0 or mutate_at < 0 or reset_at < 0:
+    raise SystemExit("ERROR: Argon upload cache reset is missing")
+if reset_at > mutate_at:
+    native = native[:reset_at] + native[reset_at + len(cache_reset):]
+    handler_start = native.find('const uploadedName=u.value.name;')
+    mutate_at = native.find('await l.mutateAsync({file:u.value', handler_start)
+    native = native[:mutate_at] + 'try{' + cache_reset + '}catch{}' + native[mutate_at:]
 if 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' not in native:
     publish_marker = 'localStorage.setItem("higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName))'
     if native.count(publish_marker) != 1:
@@ -146,6 +166,7 @@ native_path.write_text(native, encoding="utf-8")
 for marker, content in (
     ("new Image()", login),
     ("higoos-login-wallpaper.", login),
+    ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),
     ('"higoos_argon_login_wallpaper_source"', native),
     ("new File([blob],aliasName", native),
