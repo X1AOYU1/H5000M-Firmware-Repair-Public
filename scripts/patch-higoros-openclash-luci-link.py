@@ -70,12 +70,17 @@ index = root / "usr/share/higoros/web/index.html"
 if not index.is_file():
     raise SystemExit("ERROR: HigoOS web entry index.html is missing")
 html = index.read_text(encoding="utf-8")
-script_tag = '<script defer src="./assets/higoos-openclash-launcher.js"></script>'
+script_tag = '<script defer src="/assets/higoos-openclash-launcher.js"></script>'
+base_tag = '<base href="/">'
+if base_tag not in html:
+    if html.count("</head>") != 1:
+        raise SystemExit("ERROR: HigoOS index head marker is missing or ambiguous")
+    html = html.replace("</head>", base_tag + "</head>", 1)
 if script_tag not in html:
     if html.count("</body>") != 1:
         raise SystemExit("ERROR: HigoOS index body marker is missing or ambiguous")
     html = html.replace("</body>", script_tag + "</body>", 1)
     index.write_text(html, encoding="utf-8")
-if script_tag not in html or 'f.src="/cgi-bin/luci/admin/services/openclash"' not in launcher_source:
+if base_tag not in html or script_tag not in html or 'f.src="/cgi-bin/luci/admin/services/openclash"' not in launcher_source:
     raise SystemExit("ERROR: global OpenClash click launcher was not installed")
 print("PASS: global HigoOS click handler opens native LuCI in an in-shell overlay")

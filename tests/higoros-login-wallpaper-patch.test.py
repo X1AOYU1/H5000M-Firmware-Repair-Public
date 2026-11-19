@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory() as temporary:
         encoding="utf-8",
     )
     (root / "usr/share/higoros/web/index.html").write_text(
-        '<html><body><div id="app"></div></body></html>', encoding="utf-8"
+        '<html><head></head><body><div id="app"></div></body></html>', encoding="utf-8"
     )
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
     controller.parent.mkdir(parents=True)
@@ -131,7 +131,9 @@ with tempfile.TemporaryDirectory() as temporary:
     if 'x.addEventListener("click",()=>o.remove())' not in launcher:
         raise SystemExit("ERROR: OpenClash embedded overlay has no close control")
     index = (root / "usr/share/higoros/web/index.html").read_text(encoding="utf-8")
-    if '<script defer src="./assets/higoos-openclash-launcher.js"></script>' not in index:
+    if '<base href="/">' not in index:
+        raise SystemExit("ERROR: HigoOS index does not resolve assets from nested routes")
+    if '<script defer src="/assets/higoos-openclash-launcher.js"></script>' not in index:
         raise SystemExit("ERROR: global OpenClash launcher is not loaded by HigoOS")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
