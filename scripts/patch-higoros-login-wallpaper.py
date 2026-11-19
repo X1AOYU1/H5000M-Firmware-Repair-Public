@@ -114,6 +114,15 @@ if native.count(upload_anchor) == 1:
     native = native.replace(upload_anchor, upload_replacement, 1)
 elif 'const uploadedName=u.value.name;await l.mutateAsync' not in native:
     raise SystemExit("ERROR: Argon background upload success handler changed")
+if 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' not in native:
+    publish_marker = 'localStorage.setItem("higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName))'
+    if native.count(publish_marker) != 1:
+        raise SystemExit("ERROR: Argon upload wallpaper selection marker changed")
+    native = native.replace(
+        publish_marker,
+        publish_marker + ';localStorage.removeItem("higoos_argon_login_wallpaper_source")',
+        1,
+    )
 
 delete_anchor = 'await o.mutateAsync({name:c.name,revision:c.revision}),S.value=null'
 delete_replacement = (

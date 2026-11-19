@@ -32,6 +32,10 @@ with tempfile.TemporaryDirectory() as temporary:
         [sys.executable, str(repo / "scripts/patch-higoros-login-wallpaper.py"), str(root)],
         check=True,
     )
+    subprocess.run(
+        [sys.executable, str(repo / "scripts/patch-higoros-login-wallpaper.py"), str(root)],
+        check=True,
+    )
     login_source = login.read_text(encoding="utf-8")
     native_source = native.read_text(encoding="utf-8")
     required_login = (
@@ -58,6 +62,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: login page does not apply a safe local wallpaper URL")
     if any(marker not in native_source for marker in required_native):
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
+    if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 1:
+        raise SystemExit("ERROR: repeated patching duplicated or skipped the upload cache reset")
 print("PASS: existing and new Argon uploads publish a stable login wallpaper independent of browser storage")
 
 with tempfile.TemporaryDirectory() as temporary:
