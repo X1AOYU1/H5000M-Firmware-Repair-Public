@@ -109,7 +109,7 @@ for label, passed in checks.items():
     print(f"PASS: retained complete-repair feature: {label}")
 
 oc = root / "etc/openclash"
-profile = yaml.safe_load(selected_profile.read_text(encoding="utf-8"))
+profile = yaml.safe_load((oc / "config/dy.yaml").read_text(encoding="utf-8"))
 if profile.get("proxies") != [] or not profile.get("proxy-groups") or not profile.get("rules"):
     raise SystemExit("ERROR: sanitized profile lost proxy-group or rule settings")
 for path in oc.rglob("*"):
