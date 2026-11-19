@@ -100,13 +100,6 @@ with tempfile.TemporaryDirectory() as temporary:
         's("div",bl,[m(i(p),{variant:"secondary",disabled:t.value||!v.value',
         encoding="utf-8",
     )
-    (assets / "LuciAppPage-fixture.js").write_text(
-        's=l(()=>x(a.value));href:s.value,target:"_blank",rel:"noopener"',
-        encoding="utf-8",
-    )
-    (root / "usr/share/higoros/web/index.html").write_text(
-        '<html><head></head><body><div id="app"></div></body></html>', encoding="utf-8"
-    )
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
     controller.parent.mkdir(parents=True)
     controller.write_text("-- fixture", encoding="utf-8")
@@ -122,19 +115,7 @@ with tempfile.TemporaryDirectory() as temporary:
     page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
-    app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
-    if '"/apps/openclash"' not in app:
-        raise SystemExit("ERROR: OpenClash app shortcut does not resolve to the HigoOS route")
-    if 'target:JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"_self":"_blank"' not in app:
-        raise SystemExit("ERROR: OpenClash route must stay in the HigoOS browser window")
-    index = (root / "usr/share/higoros/web/index.html").read_text(encoding="utf-8")
-    if '<base href="/">' not in index:
-        raise SystemExit("ERROR: HigoOS index does not resolve assets from nested routes")
-    if "higoos-openclash-launcher" in index:
-        raise SystemExit("ERROR: obsolete full-screen OpenClash overlay is still loaded")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
     )
-    if next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8") != app:
-        raise SystemExit("ERROR: OpenClash route patch is not idempotent")

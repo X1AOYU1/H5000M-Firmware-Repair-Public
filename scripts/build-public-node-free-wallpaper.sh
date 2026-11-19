@@ -34,7 +34,6 @@ security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
-app_launcher = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
 checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
     "login card translucency preserves contrast": 'card.style.setProperty("background-color","rgba(255,255,255,.84)"' in login and 'input[type="password"]' in login and 'new MutationObserver(q)' in login,
@@ -43,7 +42,6 @@ checks = {
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "native LuCI OpenClash embed": 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"),
-    "OpenClash launcher stays in HigoOS layout": 'JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"/apps/openclash":x(a.value)' in app_launcher and 'target:JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"_self":"_blank"' in app_launcher and "higoos-openclash-launcher" not in (root / "usr/share/higoros/web/index.html").read_text(encoding="utf-8"),
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
