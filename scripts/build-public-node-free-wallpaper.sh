@@ -100,7 +100,7 @@ checks = {
     "Argon upload publication": 'new File([blob],aliasName' in native,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
-    "appearance settings UI": "LuCI" in native,
+    "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
     "package market UI": package is not None,
 }
 for label, passed in checks.items():
