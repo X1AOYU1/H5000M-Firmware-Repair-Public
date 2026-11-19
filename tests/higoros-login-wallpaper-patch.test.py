@@ -96,26 +96,3 @@ with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
     assets = root / "usr/share/higoros/web/assets"
     assets.mkdir(parents=True)
-    (assets / "OpenClashPage-fixture.js").write_text(
-        's("div",bl,[m(i(p),{variant:"secondary",disabled:t.value||!v.value',
-        encoding="utf-8",
-    )
-    controller = root / "usr/lib/lua/luci/controller/openclash.lua"
-    controller.parent.mkdir(parents=True)
-    controller.write_text("-- fixture", encoding="utf-8")
-    (root / "usr/lib/lua/luci/view/openclash").mkdir(parents=True)
-    styles = root / "www/luci-static/resources/openclash/css"
-    styles.mkdir(parents=True)
-    (styles / "oc-client.css").write_text("", encoding="utf-8")
-    (styles / "oc-common.css").write_text("", encoding="utf-8")
-    subprocess.run(
-        [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
-        check=True,
-    )
-    page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
-    if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
-        raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
-    subprocess.run(
-        [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
-        check=True,
-    )

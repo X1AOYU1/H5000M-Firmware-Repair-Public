@@ -67,7 +67,6 @@ jobs:
             output/metadata.json
             output/metadata-extracted.json
             output/login-wallpaper-fix.txt
-            output/openclash-luci-link.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
           retention-days: 30
@@ -77,9 +76,10 @@ jobs:
           tag_name: h5000m-complete-repair-node-free
           name: H5000M complete repair, node-free
           body: >-
-            Built from the complete repair baseline. OpenClash proxy nodes and
-            subscription credentials were removed; profile groups and rules,
-            other firmware repairs, and H5000M upgrade metadata were verified.
+            Built from the complete repair baseline. The original HigoOS
+            OpenClash page and layout are preserved; proxy nodes and subscription
+            credentials were removed. Other firmware repairs and H5000M upgrade
+            metadata were verified.
             Automated validation does not replace testing on a physical H5000M.
           prerelease: true
           make_latest: false
