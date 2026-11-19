@@ -21,10 +21,14 @@ jobs:
       - name: Install image tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends squashfs-tools xz-utils tar python3-yaml
       - name: Download node-free baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p input
           curl --fail --location --retry 4 --retry-all-errors \
-            https://github.com/X1AOYU1/H5000M-Firmware-Repair-Public/releases/download/node-free-baseline-2026-11-19/H5000M-OpenClash-repair-CANDIDATE-UNVERIFIED.bin \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/766539561 \
             -o input/node-free-base.bin
           echo '411c4f83208d62144d8556adc54bcb3bdd5291279cc34bec7095d32e3f851806  input/node-free-base.bin' | sha256sum -c -
       - name: Build and verify firmware
