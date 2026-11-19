@@ -126,13 +126,14 @@ elif 'const uploadedName=u.value.name;' not in native:
 cache_reset = 'localStorage.removeItem("higoos_argon_login_wallpaper_source")'
 handler_start = native.find('const uploadedName=u.value.name;')
 mutate_at = native.find('await l.mutateAsync({file:u.value', handler_start)
-reset_at = native.find(cache_reset, handler_start)
-if handler_start < 0 or mutate_at < 0 or reset_at < 0:
-    raise SystemExit("ERROR: Argon upload cache reset is missing")
-if reset_at > mutate_at:
-    native = native[:reset_at] + native[reset_at + len(cache_reset):]
-    handler_start = native.find('const uploadedName=u.value.name;')
-    mutate_at = native.find('await l.mutateAsync({file:u.value', handler_start)
+reset_at = native.find(cache_reset, handler_start) if handler_start >= 0 else -1
+if handler_start < 0 or mutate_at < 0:
+    raise SystemExit("ERROR: Argon background upload handler changed")
+if reset_at < 0 or reset_at > mutate_at:
+    if reset_at >= 0:
+        native = native[:reset_at] + native[reset_at + len(cache_reset):]
+        handler_start = native.find('const uploadedName=u.value.name;')
+        mutate_at = native.find('await l.mutateAsync({file:u.value', handler_start)
     native = native[:mutate_at] + 'try{' + cache_reset + '}catch{}' + native[mutate_at:]
 if 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' not in native:
     publish_marker = 'localStorage.setItem("higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName))'
