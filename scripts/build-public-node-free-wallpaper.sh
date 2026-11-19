@@ -38,8 +38,17 @@ for path in profiles:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise SystemExit(f"ERROR: invalid OpenClash profile: {path.relative_to(root)}")
+    node_names = {item.get("name") for item in data.get("proxies", []) if isinstance(item, dict) and item.get("name")}
     data["proxies"] = []
     data.pop("proxy-providers", None)
+    group_names = {item.get("name") for item in data.get("proxy-groups", []) if isinstance(item, dict) and item.get("name")}
+    builtins = {"DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"}
+    for group in data.get("proxy-groups", []):
+        if not isinstance(group, dict):
+            continue
+        if isinstance(group.get("proxies"), list):
+            group["proxies"] = [name for name in group["proxies"] if name not in node_names and (name in group_names or name in builtins)]
+        group.pop("use", None)
     path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
 for path in (oc / "custom", oc / "overwrite", oc / "rule_provider"):
@@ -128,9 +137,20 @@ for path in oc.rglob("*"):
         raise SystemExit(f"ERROR: possible proxy credential remains in public image: {path.relative_to(root)}")
     if path.suffix.lower() in {".yaml", ".yml"}:
         data = yaml.safe_load(body)
-        if isinstance(data, dict) and data.get("proxies"):
-            raise SystemExit(f"ERROR: proxy nodes remain in {path.relative_to(root)}")
-print("PASS: OpenClash profile nodes and UCI subscription credentials are absent; groups and rules remain")
+        if isinstance(data, dict):
+            if data.get("proxies") or data.get("proxy-providers"):
+                raise SystemExit(f"ERROR: proxy nodes or providers remain in {path.relative_to(root)}")
+            group_names = {item.get("name") for item in data.get("proxy-groups", []) if isinstance(item, dict) and item.get("name")}
+            builtins = {"DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"}
+            for group in data.get("proxy-groups", []):
+                if not isinstance(group, dict):
+                    continue
+                if set(group.get("use", [])):
+                    raise SystemExit(f"ERROR: proxy provider references remain in {path.relative_to(root)}")
+                refs = set(group.get("proxies", []))
+                if refs - group_names - builtins:
+                    raise SystemExit(f"ERROR: node references remain in proxy groups in {path.relative_to(root)}")
+print("PASS: OpenClash node definitions, group references, providers, and UCI subscription credentials are absent; group and rule structure remains")
 PY
 
 login_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type f -name 'LoginPage-*.js' -print -quit)"
