@@ -27,18 +27,10 @@ jobs:
           cmake --build /tmp/fwtool-build --parallel 2
           sudo install -m 0755 /tmp/fwtool-build/fwtool /usr/local/bin/fwtool
       - name: Download encrypted complete-repair baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p input
-          asset_id="$(curl --fail --silent --show-error \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/full-repair-baseline-encrypted-2026-11-19" \
-            | jq -r '.assets[] | select(.name == "H5000M-full-repair-baseline.aesgcm") | .id' | head -n1)"
-          test -n "$asset_id"
           curl --fail --location --retry 4 --retry-all-errors \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/octet-stream" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/full-repair-baseline-encrypted-2026-11-19/H5000M-full-repair-baseline.aesgcm" \
             -o input/full-repair-base.aesgcm
           echo '5c302300b037899abd57e277ade0f9165d9741e05a327ab179caa45ac5881bf3  input/full-repair-base.aesgcm' | sha256sum -c -
       - name: Decrypt complete-repair baseline
