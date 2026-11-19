@@ -55,6 +55,7 @@ with tempfile.TemporaryDirectory() as temporary:
         r'/\.(?:jpe?g|png|gif|webp)$/i',
         'fetch(prefix+encodeURIComponent(selected.name),{cache:"no-store"})',
         'new File([blob],aliasName',
+        'localStorage.removeItem("higoos_argon_login_wallpaper_source")',
         'higoos_argon_login_wallpaper_source',
         '背景文件已保存，但同步到 HigoOS 登录页失败',
         'Z(t(s).data.value.files.filter(b=>!b.name.startsWith("higoos-login-wallpaper."))',
@@ -65,10 +66,27 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
     if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 1:
         raise SystemExit("ERROR: repeated patching duplicated or skipped the upload cache reset")
+    if not (assets / "higoos-wallpaper-crop.js").is_file():
+        raise SystemExit("ERROR: patch did not copy the standalone crop module into web assets")
     upload_handler = native_source[native_source.index('const uploadedName=u.value.name;'):]
     if upload_handler.index('localStorage.removeItem("higoos_argon_login_wallpaper_source")') > upload_handler.index('await l.mutateAsync({file:u.value'):
         raise SystemExit("ERROR: upload cache reset occurs after the file list update")
 print("PASS: existing and new Argon uploads publish a stable login wallpaper independent of browser storage")
+crop_module = repo / "scripts/higoos-wallpaper-crop.js"
+if not crop_module.is_file():
+    raise SystemExit("ERROR: standalone HigoOS wallpaper crop module is missing")
+crop_source = crop_module.read_text(encoding="utf-8")
+required_crop = (
+    'mountHigoosWallpaperCrop({upload:file=>l.mutateAsync',
+    'higoos-cropped-wallpaper-${Date.now()}.jpg',
+    'new MutationObserver(addButtons)',
+    '保存裁切并应用',
+    'pointermove',
+    'canvas.toBlob',
+    'await upload(output)',
+)
+if any(marker not in native_source + crop_source for marker in required_crop):
+    raise SystemExit("ERROR: crop controls are not connected to the native upload API")
 
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
@@ -76,6 +94,10 @@ with tempfile.TemporaryDirectory() as temporary:
     assets.mkdir(parents=True)
     (assets / "OpenClashPage-fixture.js").write_text(
         's("div",bl,[m(i(p),{variant:"secondary",disabled:t.value||!v.value',
+        encoding="utf-8",
+    )
+    (assets / "LuciAppPage-fixture.js").write_text(
+        's=l(()=>x(a.value));href:s.value,target:"_blank",rel:"noopener"',
         encoding="utf-8",
     )
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
@@ -93,3 +115,14 @@ with tempfile.TemporaryDirectory() as temporary:
     page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
+    app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
+    if 's=l(()=>a.value?.luciUrl?.endsWith("/services/openclash")?"/apps/openclash":x(a.value))' not in app:
+        raise SystemExit("ERROR: OpenClash app shortcut does not resolve to the HigoOS route")
+    if 'href:s.value,target:a.value?.luciUrl?.endsWith("/services/openclash")?"_self":"_blank"' not in app:
+        raise SystemExit("ERROR: OpenClash app shortcut does not open in the HigoOS shell")
+    subprocess.run(
+        [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
+        check=True,
+    )
+    if next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8") != app:
+        raise SystemExit("ERROR: OpenClash shortcut patch is not idempotent")

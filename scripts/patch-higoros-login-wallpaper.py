@@ -70,6 +70,12 @@ login_path.write_text(login, encoding="utf-8")
 
 native_path = native_pages[0]
 native = native_path.read_text(encoding="utf-8")
+crop_module = assets / "higoos-wallpaper-crop.js"
+crop_source = Path(__file__).with_name("higoos-wallpaper-crop.js").read_text(encoding="utf-8")
+crop_import = 'import{mountHigoosWallpaperCrop}from"./higoos-wallpaper-crop.js";'
+if crop_import not in native:
+    native = crop_import + native
+crop_module.write_text(crop_source, encoding="utf-8")
 files_anchor = 'const{query:s,upload:l,remove:o}=Fe(),v=V(null)'
 files_replacement = 'const{query:s,upload:l,remove:o}=Fe(),v=V(null)'
 if native.count(files_anchor) != 1:
@@ -110,6 +116,13 @@ elif 'g=D(()=>l.isPending.value||o.isPending.value);ee(()=>s.data.value?.files,f
     native = native[:watcher_start] + query_watch_replacement + native[watcher_end:]
 else:
     raise SystemExit("ERROR: Argon background list watcher anchor changed")
+
+crop_call = 'mountHigoosWallpaperCrop({upload:file=>l.mutateAsync({file,revision:s.data.value?.newRevision})});'
+if crop_call not in native:
+    crop_anchor = 'async function r()'
+    if native.count(crop_anchor) != 1:
+        raise SystemExit("ERROR: Argon background upload function anchor changed")
+    native = native.replace(crop_anchor, crop_call + crop_anchor, 1)
 
 upload_anchor = 'try{await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision}),u.value=null'
 upload_replacement = (
@@ -171,8 +184,10 @@ for marker, content in (
     ("/luci-static/argon/background/", native),
     ('"higoos_argon_login_wallpaper_source"', native),
     ("new File([blob],aliasName", native),
+    ("mountHigoosWallpaperCrop({upload:file=>l.mutateAsync", native),
+    ("export function mountHigoosWallpaperCrop", crop_source),
     ('files.filter(b=>!b.name.startsWith("higoos-login-wallpaper."))', native),
 ):
     if marker not in content:
         raise SystemExit(f"ERROR: login wallpaper integration missing {marker}")
-print("PASS: HigoOS login probes a stable Argon background path; existing and new uploads publish there")
+print("PASS: HigoOS login probes a stable Argon background path; crop output uploads through the native Argon API")

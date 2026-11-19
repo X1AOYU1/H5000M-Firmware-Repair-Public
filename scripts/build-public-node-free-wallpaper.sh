@@ -37,6 +37,8 @@ checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
     "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
+    "wallpaper crop module is imported": 'import{mountHigoosWallpaperCrop}from"./higoos-wallpaper-crop.js";' in native and (assets / "higoos-wallpaper-crop.js").is_file(),
+    "wallpaper crop controls and upload": all(value in (assets / "higoos-wallpaper-crop.js").read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "native LuCI OpenClash embed": 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' in next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8"),
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
