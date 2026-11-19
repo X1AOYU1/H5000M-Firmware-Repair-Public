@@ -46,8 +46,10 @@ with tempfile.TemporaryDirectory() as temporary:
         'wallpaper.value?{backgroundImage:',
         'backgroundSize:"cover"',
         'wallpaper.value?i("img",{src:wallpaper.value',
-        'backgroundColor:"rgba(255,255,255,.84)"',
-        'backdropFilter:"blur(12px)"',
+        'card.style.setProperty("background-color","rgba(255,255,255,.84)"',
+        'input[type="password"]',
+        'new MutationObserver(q)',
+        'style.setProperty("backdrop-filter","blur(12px)")',
     )
     required_native = (
         'localStorage.setItem(key,prefix+encodeURIComponent(selected.name))',

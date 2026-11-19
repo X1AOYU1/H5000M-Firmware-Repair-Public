@@ -37,7 +37,7 @@ crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 app_launcher = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
 checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
-    "login card translucency preserves contrast": 'backgroundColor:"rgba(255,255,255,.84)"' in login and 'WebkitBackdropFilter:"blur(12px)"' in login,
+    "login card translucency preserves contrast": 'card.style.setProperty("background-color","rgba(255,255,255,.84)"' in login and 'input[type="password"]' in login and 'new MutationObserver(q)' in login,
     "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,

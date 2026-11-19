@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Apply uploaded Argon image backgrounds to the HigoOS SPA login page."""
 from pathlib import Path
-import re
 import sys
 
 
@@ -30,7 +29,15 @@ login_probe = (
     'if(w&&w.startsWith("/luci-static/argon/background/"))p.push(w)}catch{}'
     'p.push(...["webp","png","jpg","jpeg","gif"].map(e=>"/luci-static/argon/background/higoos-login-wallpaper."+e));'
     'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>wallpaper.value=w+"?v="+Date.now();'
-    'image.onerror=n;image.src=w+"?v="+Date.now()};n()})()'
+    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo;const q=()=>{if(!wallpaper.value)return;'
+    'const input=document.querySelector(\'input[type="password"]\');for(let card=input?.parentElement;card&&card!==document.body;card=card.parentElement){'
+    'const box=card.getBoundingClientRect(),style=getComputedStyle(card),color=/rgba?\\(([^)]+)\\)/.exec(style.backgroundColor),parts=color?.[1].split(",").map(Number),'
+    'white=parts&&parts.slice(0,3).every(value=>value>245)&&(parts[3]??1)>.95;'
+    'if(box.width>=320&&box.height>=250&&style.borderRadius!=="0px"&&white){'
+    'card.style.setProperty("background-color","rgba(255,255,255,.84)","important");'
+    'card.style.setProperty("backdrop-filter","blur(12px)");card.style.setProperty("-webkit-backdrop-filter","blur(12px)");'
+    'card.style.setProperty("border","1px solid rgba(255,255,255,.5)");mo?.disconnect();break}}};q();'
+    'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true})})()'
 )
 mounted_replacement = (
     'x.query.changed==="1"&&(m.value=!1,s.value="密码已修改，请使用新密码登录"),'
@@ -68,23 +75,6 @@ if login.count(image_anchor) == 1:
 elif 'wallpaper.value?i("img",{src:wallpaper.value' not in login:
     raise SystemExit("ERROR: HigoOS login background image insertion point changed")
 login_path.write_text(login, encoding="utf-8")
-
-# Keep the login form readable while allowing the uploaded image to show
-# through its white card as a restrained frosted-glass surface.
-card_marker = 'backgroundColor:"rgba(255,255,255,.84)",backdropFilter:"blur(12px)"'
-if card_marker not in login:
-    card_pattern = re.compile(r'e\("div",\{class:"(?=[^"]*\bbg-white\b)(?=[^"]*\brounded[^ ]*)(?=[^"]*\bshadow[^ ]*)[^"]*"')
-    login, card_count = card_pattern.subn(
-        lambda match: match.group(0)[:-1]
-        + ',style:wallpaper.value?{backgroundColor:"rgba(255,255,255,.84)",'
-        + 'backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",'
-        + 'border:"1px solid rgba(255,255,255,.5)"}:void 0',
-        login,
-        count=1,
-    )
-    if card_count != 1:
-        raise SystemExit("ERROR: HigoOS login form card style anchor changed")
-    login_path.write_text(login, encoding="utf-8")
 
 native_path = native_pages[0]
 native = native_path.read_text(encoding="utf-8")
@@ -197,7 +187,7 @@ native_path.write_text(native, encoding="utf-8")
 
 for marker, content in (
     ("new Image()", login),
-    ('backgroundColor:"rgba(255,255,255,.84)"', login),
+    ('card.style.setProperty("background-color","rgba(255,255,255,.84)"', login),
     ("higoos-login-wallpaper.", login),
     ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),
