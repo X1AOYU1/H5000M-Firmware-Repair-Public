@@ -35,7 +35,8 @@ jobs:
         env:
           TZ: Asia/Shanghai
         run: |
-          bash scripts/build-public-node-free-wallpaper.sh input/node-free-base.bin output
+          python3 tests/higoros-login-wallpaper-patch.test.py
+          sudo bash scripts/build-public-node-free-wallpaper.sh input/node-free-base.bin output
       - uses: actions/upload-artifact@v4
         with:
           name: H5000M-node-free-login-wallpaper-firmware
