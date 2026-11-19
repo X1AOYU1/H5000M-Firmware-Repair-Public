@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: h5000m-public-node-free-build
@@ -19,35 +19,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install image tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends squashfs-tools xz-utils tar python3-yaml cmake build-essential git
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends squashfs-tools xz-utils tar python3-yaml python3-cryptography cmake build-essential git jq
       - name: Build fwtool
         run: |
           git clone --depth 1 https://git.openwrt.org/project/fwtool.git /tmp/fwtool-src
           cmake -S /tmp/fwtool-src -B /tmp/fwtool-build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/fwtool-build --parallel 2
           sudo install -m 0755 /tmp/fwtool-build/fwtool /usr/local/bin/fwtool
-      - name: Download node-free baseline
+      - name: Download encrypted complete-repair baseline
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p input
+          asset_id="$(curl --fail --silent --show-error \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/full-repair-baseline-encrypted-2026-11-19" \
+            | jq -r '.assets[] | select(.name == "H5000M-full-repair-baseline.aesgcm") | .id' | head -n1)"
+          test -n "$asset_id"
           curl --fail --location --retry 4 --retry-all-errors \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/octet-stream" \
-            https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/766539561 \
-            -o input/node-free-base.bin
-          echo '411c4f83208d62144d8556adc54bcb3bdd5291279cc34bec7095d32e3f851806  input/node-free-base.bin' | sha256sum -c -
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+            -o input/full-repair-base.aesgcm
+          echo '5c302300b037899abd57e277ade0f9165d9741e05a327ab179caa45ac5881bf3  input/full-repair-base.aesgcm' | sha256sum -c -
+      - name: Decrypt complete-repair baseline
+        env:
+          FULL_REPAIR_BASE_KEY: ${{ secrets.FULL_REPAIR_BASE_KEY }}
+        run: |
+          test -n "$FULL_REPAIR_BASE_KEY"
+          python3 scripts/decrypt-private-baseline.py input/full-repair-base.aesgcm input/full-repair-base.bin "$FULL_REPAIR_BASE_KEY"
+          echo '0ef1a767462ea78271d67388421dda5de3b4097a5a786db47dc75276130492e4  input/full-repair-base.bin' | sha256sum -c -
       - name: Build and verify firmware
         env:
           TZ: Asia/Shanghai
         run: |
           python3 tests/higoros-login-wallpaper-patch.test.py
-          sudo bash scripts/build-public-node-free-wallpaper.sh input/node-free-base.bin output
+          sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - uses: actions/upload-artifact@v4
         with:
-          name: H5000M-node-free-login-wallpaper-firmware
+          name: H5000M-complete-repair-node-free-firmware
           path: |
-            output/H5000M-6.6.160-login-wallpaper-NO-NODES.bin
+            output/H5000M-6.6.160-full-repair-NO-NODES.bin
             output/SHA256SUMS.txt
             output/firmware-size.txt
             output/firmware-verification.txt
@@ -56,3 +67,22 @@ jobs:
             output/login-wallpaper-fix.txt
             output/frontend-asset-revision.txt
           retention-days: 30
+      - name: Publish verified firmware release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: h5000m-complete-repair-node-free
+          name: H5000M complete repair, node-free
+          body: >-
+            Built from the complete repair baseline. OpenClash proxy nodes and
+            subscription credentials were removed; profile groups and rules,
+            other firmware repairs, and H5000M upgrade metadata were verified.
+            Automated validation does not replace testing on a physical H5000M.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: |
+            output/H5000M-6.6.160-full-repair-NO-NODES.bin
+            output/SHA256SUMS.txt
+            output/firmware-size.txt
+            output/firmware-verification.txt
+            output/metadata.json

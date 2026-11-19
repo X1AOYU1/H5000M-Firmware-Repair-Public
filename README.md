@@ -1,11 +1,9 @@
-# H5000M node-free firmware repair
+# H5000M complete-repair, node-free firmware
 
-This public repository builds a H5000M image from a baseline that contains no user proxy nodes. The build verifies the empty OpenClash proxy lists before and after repacking and publishes only the firmware and checksums.
+This repository rebuilds the complete repaired H5000M firmware from an encrypted baseline. The baseline is decrypted only on the ephemeral GitHub Actions runner. It is not committed in plaintext.
 
-The OpenClash service remains disabled by default. Firmware artifacts from this repository contain no private subscription profile, nodes, or backup archive.
+The build preserves the repaired WAN and IPv6 selectors, password policy controls, LuCI appearance and wallpaper fixes, package-market UI, and the other firmware contents. It removes only proxy nodes and subscription providers from the OpenClash profiles, retaining profile groups, rules, and non-secret resources. OpenClash remains disabled by default.
 
-The current repair makes uploaded Argon image backgrounds available on the HigoOS login page. After uploading an image in the authenticated settings UI, the page publishes a stable local copy for the unauthenticated login screen. Missing images fall back to the original login appearance.
-
-GitHub Actions build on `ubuntu-24.04`, using a standard GitHub-hosted runner and a public, node-free baseline release asset.
+The build verifies the source profile shape, confirms that proxy nodes and credentials are absent from the public image, checks the retained firmware UI fixes, and round-trips the H5000M sysupgrade metadata.
 
 Automated checks do not replace flashing and testing on an H5000M device.

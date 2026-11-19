@@ -1,42 +1,147 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-IMAGE="${1:?usage: build-public-node-free-wallpaper.sh node-free-base.bin output-dir}"
+IMAGE="${1:?usage: build-public-node-free-wallpaper.sh full-repair-base.bin output-dir}"
 OUT="${2:?missing output directory}"
-EXPECTED="411c4f83208d62144d8556adc54bcb3bdd5291279cc34bec7095d32e3f851806"
+EXPECTED="0ef1a767462ea78271d67388421dda5de3b4097a5a786db47dc75276130492e4"
 mkdir -p "$OUT/tar" "$OUT/rootfs"
 actual="$(sha256sum "$IMAGE" | awk '{print $1}')"
-[[ "$actual" == "$EXPECTED" ]] || { echo "ERROR: node-free base firmware SHA256 mismatch"; exit 2; }
+[[ "$actual" == "$EXPECTED" ]] || { echo "ERROR: full-repair base firmware SHA256 mismatch"; exit 2; }
 tar -xf "$IMAGE" -C "$OUT/tar"
 root="$(find "$OUT/tar" -type f -name root -print -quit)"
 [[ -n "$root" ]] || { echo "ERROR: firmware root SquashFS missing"; exit 3; }
 unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
 
-config="$OUT/rootfs/etc/openclash/config/config.yaml"
-[[ -f "$config" ]] || { echo "ERROR: no-node OpenClash starter config missing"; exit 4; }
-python3 - "$config" <<'PY'
+python3 - "$OUT/rootfs" <<'PY'
 from pathlib import Path
+import re
 import sys
 import yaml
-path = Path(sys.argv[1])
-config = yaml.safe_load(path.read_text(encoding="utf-8"))
-if not isinstance(config, dict) or config.get("proxies") != [] or config.get("proxy-groups") != []:
-    raise SystemExit("ERROR: public firmware base contains proxy nodes or groups")
-if any(key in config for key in ("proxy-providers", "proxy-provider")):
-    raise SystemExit("ERROR: public firmware base contains proxy providers")
-print("PASS: OpenClash profile contains no nodes, groups, or providers")
-PY
-if find "$OUT/rootfs/etc/openclash" -type f \( -iname '*.yaml' -o -iname '*.yml' \) \
-    -exec grep -IlE '^[[:space:]]*(server|password|uuid|token):[[:space:]]*[^[:space:]]+' {} + | grep -q .; then
-  echo "ERROR: possible credential-bearing YAML found in public firmware base"
-  exit 5
-fi
 
+root = Path(sys.argv[1])
+oc = root / "etc/openclash"
+config_dir = oc / "config"
+config_dir.mkdir(parents=True, exist_ok=True)
+profiles = sorted({*oc.rglob("*.yaml"), *oc.rglob("*.yml")})
+config_profiles = [path for path in profiles if path.is_relative_to(config_dir)]
+if not config_profiles:
+    raise SystemExit("ERROR: no OpenClash YAML profiles found to sanitize")
+selected_profile = next((path for path in config_profiles if path.name == "dy.yaml"), config_profiles[0])
+source_profile = yaml.safe_load(selected_profile.read_text(encoding="utf-8"))
+if not isinstance(source_profile, dict) or len(source_profile.get("proxies", [])) != 176:
+    raise SystemExit("ERROR: expected the selected 176-node dy.yaml source profile")
+if len(source_profile.get("proxy-groups", [])) != 5 or len(source_profile.get("rules", [])) != 24:
+    raise SystemExit("ERROR: selected dy.yaml configuration shape does not match the verified source")
+for path in profiles:
+    if not (path.is_relative_to(config_dir) or path.is_relative_to(oc / "backup")):
+        continue
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"ERROR: invalid OpenClash profile: {path.relative_to(root)}")
+    data["proxies"] = []
+    data.pop("proxy-providers", None)
+    path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+for path in (oc / "custom", oc / "overwrite", oc / "rule_provider"):
+    if not path.is_dir():
+        continue
+    for item in path.rglob("*"):
+        if item.is_file():
+            try:
+                text = item.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+            if re.search(r"(?i)(?:password|passwd|secret|token|uuid)\s*[:=]\s*[^\s,'\"]+|(?:vmess|vless|trojan|ss)://", text):
+                raise SystemExit(f"ERROR: credential-bearing OpenClash resource found: {item.relative_to(root)}")
+
+uci = root / "etc/config/openclash"
+if not uci.is_file():
+    raise SystemExit("ERROR: OpenClash UCI configuration missing")
+text = uci.read_text(encoding="utf-8")
+secret_keys = re.compile(r"(?i)(?:subscribe|subscription|token|password|passwd|secret|uuid|server_url|config_url|repo_url|github|access_key|refresh_token)")
+lines = [line for line in text.splitlines() if not (line.lstrip().startswith(("option ", "list ")) and secret_keys.search(line.split(None, 2)[1] if len(line.split(None, 2)) > 1 else ""))]
+text = "\n".join(lines) + "\n"
+section_start = re.search(r"(?m)^config\s+openclash\s+['\"]config['\"]\s*$", text)
+if not section_start:
+    raise SystemExit("ERROR: OpenClash config UCI section missing")
+next_section = re.search(r"(?m)^config\s+", text[section_start.end():])
+section_end = section_start.end() + next_section.start() if next_section else len(text)
+section = text[section_start.start():section_end]
+for key, value in {"enable": "0", "config_path": "/" + str(selected_profile.relative_to(root))}.items():
+    pattern = re.compile(rf"(?m)^[ \t]*option[ \t]+{re.escape(key)}[ \t]+['\"][^'\"]*['\"][ \t]*$")
+    rendered = f"\toption {key} '{value}'"
+    section = pattern.sub(rendered, section, count=1) if pattern.search(section) else section.rstrip() + "\n" + rendered + "\n"
+text = text[:section_start.start()] + section + text[section_end:]
+uci.write_text(text, encoding="utf-8")
+
+print("PASS: removed proxy nodes from profiles and sanitized profile UCI while preserving groups and rules")
+PY
+
+# Apply the current login-page fix and revise every SPA asset URL afterward.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
 python3 scripts/revision-higoros-web-assets.py "$OUT/rootfs" | tee "$OUT/frontend-asset-revision.txt"
-node_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type f -name 'LoginPage-*.js' -print -quit)"
-node --check "$node_asset"
 
+python3 - "$OUT/rootfs" <<'PY'
+from pathlib import Path
+import re
+import sys
+import yaml
+
+root = Path(sys.argv[1])
+assets = root / "usr/share/higoros/web/assets"
+login = next(assets.glob("LoginPage-*.js")).read_text(encoding="utf-8")
+native = next(assets.glob("NativeConfigSection*.js")).read_text(encoding="utf-8")
+network = next(assets.glob("NetworkPage-*.js")).read_text(encoding="utf-8")
+security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
+system = next(assets.glob("SystemPage-*.js")).read_text(encoding="utf-8")
+checks = {
+    "login wallpaper": "higoos-login-wallpaper." in login and "wallpaper.value?{backgroundImage:" in login,
+    "Argon upload publication": 'new File([blob],aliasName' in native,
+    "WAN and IPv6 edit controls": all(value in network for value in ("DHCP/static/PPPoE", "DHCPv6/static/6to4/DS-Lite", "WAN连接方式保存失败", "IPv6连接方式保存失败")),
+    "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
+    "appearance settings": "显示 LuCI 外观设置" in system,
+    "package market UI": (root / "usr/share/higoros/web/assets").glob("PackagesPage-*.js") and True,
+}
+package = next((assets.glob("PackagesPage-*.js")), None)
+if package:
+    package_text = package.read_text(encoding="utf-8")
+    checks["package market update and layout fixes"] = all(value in package_text for value in (
+        'd.installed&&!e(pe)(d)?d.protected?',
+        'i.value.installed&&!e(pe)(i.value)?i.value.protected?',
+        'label:"同时安装建议翻译包"',
+        'label:"允许覆盖冲突的软件包文件"',
+    ))
+else:
+    checks["package market update and layout fixes"] = False
+for label, passed in checks.items():
+    if not passed:
+        raise SystemExit(f"ERROR: complete-repair feature missing after node cleanup: {label}")
+    print(f"PASS: retained complete-repair feature: {label}")
+
+oc = root / "etc/openclash"
+profile = yaml.safe_load(selected_profile.read_text(encoding="utf-8"))
+if profile.get("proxies") != [] or not profile.get("proxy-groups") or not profile.get("rules"):
+    raise SystemExit("ERROR: sanitized profile lost proxy-group or rule settings")
+for path in oc.rglob("*"):
+    if not path.is_file() or path.suffix.lower() not in {".yaml", ".yml", ".conf", ".json", ".txt", ".sh", ".list", ".dat"}:
+        continue
+    try:
+        body = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        continue
+    is_profile = path.is_relative_to(oc / "config") or path.is_relative_to(oc / "backup")
+    sensitive = r"(?i)(?:password|passwd|secret|token|uuid)\s*[:=]\s*[^\s,'\"]+|(?:vmess|vless|trojan|ss)://"
+    if not is_profile and re.search(sensitive, body):
+        raise SystemExit(f"ERROR: possible proxy credential remains in public image: {path.relative_to(root)}")
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        data = yaml.safe_load(body)
+        if isinstance(data, dict) and data.get("proxies"):
+            raise SystemExit(f"ERROR: proxy nodes remain in {path.relative_to(root)}")
+print("PASS: OpenClash profile nodes and UCI subscription credentials are absent; groups and rules remain")
+PY
+
+login_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type f -name 'LoginPage-*.js' -print -quit)"
+node --check "$login_asset"
 new_root="$OUT/rootfs.repaired"
 mksquashfs "$OUT/rootfs" "$new_root" -noappend -comp xz -b 262144 -no-xattrs -processors 2 >/dev/null
 python3 - "$IMAGE" "$root" "$new_root" "$OUT/repaired.tar" <<'PY'
@@ -61,39 +166,38 @@ with tarfile.open(source, "r:*") as archive:
             with open(new_root, "rb") as stream:
                 packed.addfile(info, stream)
 PY
-cp "$OUT/repaired.tar" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
-metadata="$OUT/metadata.json"
-cat > "$metadata" <<'JSON'
+cp "$OUT/repaired.tar" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
+cat > "$OUT/metadata.json" <<'JSON'
 { "metadata_version": "1.1", "compat_version": "1.0", "supported_devices": ["hiveton,h5000m", "hiveton-h5000m"], "version": { "dist": "ImmortalWrt", "version": "24.10-SNAPSHOT", "revision": "unknown", "target": "mediatek/filogic", "board": "hiveton,h5000m" } }
 JSON
-fwtool -I "$metadata" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
-fwtool -i "$OUT/metadata-extracted.json" "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin"
-cmp "$metadata" "$OUT/metadata-extracted.json"
+fwtool -I "$OUT/metadata.json" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
+fwtool -i "$OUT/metadata-extracted.json" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
+cmp "$OUT/metadata.json" "$OUT/metadata-extracted.json"
 python3 - "$OUT/metadata-extracted.json" <<'PY'
 import json
 import sys
-metadata = json.load(open(sys.argv[1], encoding="utf-8"))
-assert metadata["compat_version"] == "1.0"
-assert "hiveton,h5000m" in metadata["supported_devices"]
-assert metadata["version"]["target"] == "mediatek/filogic"
-assert metadata["version"]["board"] == "hiveton,h5000m"
-print("PASS: H5000M sysupgrade metadata round-trip and board compatibility verified")
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["compat_version"] == "1.0" and "hiveton,h5000m" in data["supported_devices"]
+assert data["version"]["target"] == "mediatek/filogic"
+print("PASS: H5000M upgrade metadata round-trip verified")
 PY
 
 mkdir -p "$OUT/final-tar"
-tar -xf "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" -C "$OUT/final-tar"
+tar -xf "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" -C "$OUT/final-tar"
 final_root="$(find "$OUT/final-tar" -type f -name root -print -quit)"
 unsquashfs -no-progress -d "$OUT/final-root" "$final_root" >/dev/null
 grep -q 'higoos-login-wallpaper\.' "$OUT/final-root/usr/share/higoros/web/assets/"LoginPage-*.js
-grep -q 'new File(\[blob\],aliasName' "$OUT/final-root/usr/share/higoros/web/assets/"NativeConfigSection*.js
-python3 - "$OUT/final-root/etc/openclash/config/config.yaml" <<'PY'
+python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" <<'PY'
 from pathlib import Path
+import re
 import sys
 import yaml
-config = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
-if config.get("proxies") != [] or config.get("proxy-groups") != []:
-    raise SystemExit("ERROR: final firmware is not node-free")
+uci = Path(sys.argv[1]).read_text(encoding="utf-8")
+match = re.search(r"(?m)^\s*option config_path ['\"]([^'\"]+)['\"]", uci)
+assert match, "OpenClash selected config_path is missing"
+profile = yaml.safe_load((Path(sys.argv[2]) / Path(match.group(1)).name).read_text(encoding="utf-8"))
+assert profile.get("proxies") == [] and profile.get("proxy-groups") and profile.get("rules")
 PY
-sha256sum "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
-stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-login-wallpaper-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
-echo "PASS: final firmware contains HigoOS login wallpaper fix, H5000M sysupgrade metadata, and no proxy nodes" | tee "$OUT/firmware-verification.txt"
+sha256sum "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
+stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
+echo "PASS: complete H5000M repair features retained; OpenClash nodes removed; upgrade metadata verified" | tee "$OUT/firmware-verification.txt"

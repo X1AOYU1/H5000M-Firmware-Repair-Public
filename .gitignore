@@ -1,0 +1,9 @@
+actions-key.secret.txt
+actions-key.sealed.txt
+decrypted-baseline.test.bin
+public-full-repair-baseline.aesgcm
+*.aesgcm
+*.secret.txt
+input/
+output/
+H5000M-public-build-*/
