@@ -118,10 +118,12 @@ with tempfile.TemporaryDirectory() as temporary:
     if 'y("iframe",{src:"/cgi-bin/luci/admin/services/openclash"' not in page:
         raise SystemExit("ERROR: native LuCI OpenClash iframe is missing")
     app = next(assets.glob("LuciAppPage-*.js")).read_text(encoding="utf-8")
-    if 's=l(()=>a.value?.luciUrl?.toLowerCase().includes("/services/openclash")?"/apps/openclash":x(a.value))' not in app:
+    if 's=l(()=>JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"/apps/openclash":x(a.value))' not in app:
         raise SystemExit("ERROR: OpenClash app shortcut does not resolve to the HigoOS route")
-    if 'href:s.value,target:a.value?.luciUrl?.toLowerCase().includes("/services/openclash")?"_self":"_blank"' not in app:
+    if 'href:s.value,target:JSON.stringify(a.value||{}).toLowerCase().includes("openclash")?"_self":"_blank"' not in app:
         raise SystemExit("ERROR: OpenClash app shortcut does not open in the HigoOS shell")
+    if 'e.preventDefault();window.location.assign("/apps/openclash")' not in app:
+        raise SystemExit("ERROR: OpenClash launcher has no explicit same-page navigation handler")
     subprocess.run(
         [sys.executable, str(repo / "scripts/patch-higoros-openclash-luci-link.py"), str(root)],
         check=True,
