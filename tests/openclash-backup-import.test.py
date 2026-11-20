@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import sys
 import tempfile
+import re
 
 
 repo = Path(__file__).resolve().parents[1]
@@ -66,6 +67,9 @@ with tempfile.TemporaryDirectory() as temporary:
         subprocess.run([node, "--check", str(next(assets.glob("OpenClashPage-*.js")))], check=True)
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
+    user_backup_name = "Backup-OpenClash-Hiveton H5000M-aarch64-2026-11-20-14-47-56.tar"
+    if not re.search(r"\.tar(?:\.gz)?$", user_backup_name, re.IGNORECASE) or len(user_backup_name.encode("utf-8")) > 240 or any(char in user_backup_name for char in "/\\") or any(ord(char) < 32 or ord(char) == 127 for char in user_backup_name):
+        raise SystemExit("ERROR: the supplied H5000M .tar backup filename is not accepted")
     required_page = (
         'id:"oc-backup-file-type",value:uploadType.value',
         'uploadType=g("config")',
@@ -78,22 +82,26 @@ with tempfile.TemporaryDirectory() as temporary:
         '代理文件',
         '规则集文件',
         '[Meta] 内核文件 (.tar.gz)',
-        '备份文件 (.tar.gz)',
+        '备份文件 (.tar/.tar.gz)',
         'uploadType.value==="backup-file"||uploadType.value==="clash_meta"',
-        'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":".tar.gz,application/gzip",style:{display:"none"}',
+        'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"}',
+        'file.name):uploadType.value==="clash_meta"',
+        'valid=uploadType.value==="backup-file"? /\\.tar(?:\\.gz)?$/i.test(file.name)',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"未选择文件"',
         'async function downloadBackup()',
-        'raw.replace(/<[^>]*>/g," ")',
+        'raw.replace(/<!--[\\s\\S]*?-->/g," ")',
+        'replace(/<style[\\s\\S]*?<\\/style>/gi," ")',
         'backup_type:"backup"',
         '上传文件类型：',
         '选择文件',
         '未选择文件',
         '上传',
         'd("备份")',
-        'class:"flex flex-wrap items-center gap-2"',
+        'class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}',
+        'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
-        'body:file.slice(offset,offset+262144)',
+        'body:file.slice(offset,offset+65536)',
         'params.operation==="download"?"backup":"upload"',
         '/cgi-bin/luci/higoros/openclash/',
     )
@@ -115,13 +123,13 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"flex flex-wrap items-center gap-2"') != 1:
-        raise SystemExit("ERROR: backup controls are not grouped in one responsive HigoOS toolbar")
+    if page.count('class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+        raise SystemExit("ERROR: native upload row and existing file controls are not separated")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
-    if 'function action_higoros_upload()' not in endpoint or 'HTTP.content()' not in endpoint or 'current ~= offset' not in endpoint or '#chunk > 262144' not in endpoint or 'higoros_upload_entry.sysauth = false' not in endpoint or 'entry({"higoros", "openclash", "upload"}' not in endpoint or 'config = { dir = "/etc/openclash/config"' not in endpoint or 'clash_meta = { suffix = filename:match("%.tar%.gz$") and true }' not in endpoint or 'header:byte(19) == 183' not in endpoint:
+    if 'function action_higoros_upload()' not in endpoint or 'HTTP.content()' not in endpoint or 'current ~= offset' not in endpoint or '#chunk > 65536' not in endpoint or 'lower_filename = filename:lower()' not in endpoint or 'filename:find("/", 1, true)' not in endpoint or 'filename:find("\\\\", 1, true)' not in endpoint or 'higoros_upload_entry.sysauth = false' not in endpoint or 'entry({"higoros", "openclash", "upload"}' not in endpoint or 'config = { dir = "/etc/openclash/config"' not in endpoint or 'clash_meta = { suffix = lower_filename:match("%.tar%.gz$") and true }' not in endpoint or 'lower_filename:match("%.tar$")' not in endpoint or 'local suffix = lower_filename:match("%.tar%.gz$") and ".tar.gz" or lower_filename:match("%.tar$") and ".tar" or ".upload"' not in endpoint or 'header:byte(19) == 183' not in endpoint:
         raise SystemExit("ERROR: native file type upload endpoint is incomplete")
     if 'entry({"higoros", "openclash", "backup"}' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint:
         raise SystemExit("ERROR: backup download endpoint is still behind the LuCI admin route")
@@ -143,6 +151,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: native backup generation options are not exposed to HigoOS")
     if 'Backup must be a .tar or .tar.gz archive' not in endpoint:
         raise SystemExit("ERROR: .tar backup support is missing")
+    if 'filename:find("/", 1, true)' not in endpoint or 'filename:find("\\\\", 1, true)' not in endpoint:
+        raise SystemExit("ERROR: backup filename validation rejects normal names or permits unsafe paths")
     if 'tar_list_options = gzip_archive and "tzf " or "tf "' not in backend or 'tar_extract_options = gzip_archive and "-xzf " or "-xf "' not in backend:
         raise SystemExit("ERROR: .tar and .tar.gz extraction modes are incomplete")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:

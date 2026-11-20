@@ -12,6 +12,44 @@ controller = root / "usr/lib/lua/luci/controller/openclash.lua"
 if len(pages) != 1 or not lua.is_file() or not controller.is_file():
     raise SystemExit("ERROR: HigoOS OpenClash frontend or LuCI restore library is missing")
 
+
+def matching_delimiter(text, opening):
+    pairs = {"[": "]", "(": ")", "{": "}"}
+    if text[opening] not in pairs:
+        raise ValueError("opening delimiter expected")
+    stack = [pairs[text[opening]]]
+    quote = None
+    escaped = False
+    index = opening + 1
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in ("'", '"', "`"):
+            quote = char
+        elif char == "/" and index + 1 < len(text) and text[index + 1] == "/":
+            end = text.find("\n", index + 2)
+            index = len(text) if end < 0 else end
+        elif char == "/" and index + 1 < len(text) and text[index + 1] == "*":
+            end = text.find("*/", index + 2)
+            if end < 0:
+                raise ValueError("unterminated comment")
+            index = end + 1
+        elif char in pairs:
+            stack.append(pairs[char])
+        elif char in pairs.values():
+            if not stack or char != stack.pop():
+                raise ValueError("mismatched delimiter")
+            if not stack:
+                return index
+        index += 1
+    raise ValueError("unterminated delimiter")
+
 page = pages[0].read_text(encoding="utf-8")
 state_anchor = 've=g("config"),X=g(""),he=W(()=>'
 state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),uploadType=g("config"),he=W', 1)
@@ -25,7 +63,7 @@ else:
 method_anchor = 'async function Je(){'
 method = (
     'async function backupRequest(params,options={}){const path=params.operation==="download"?"backup":"upload";const response=await fetch("/cgi-bin/luci/higoros/openclash/"+path+"?"+new URLSearchParams(params),{credentials:"same-origin",...options});'
-    'if(!response.ok){const raw=await response.text(),message=raw.replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,240);throw new Error(message||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
+    'if(!response.ok){const raw=await response.text();if(/POST data exceeds maximum allowed length/i.test(raw))throw new Error("路由器拒绝了上传数据块（HTTP "+response.status+"），请重新刷入新版固件");const clean=raw.replace(/<!--[\\s\\S]*?-->/g," ").replace(/<style[\\s\\S]*?<\\/style>/gi," ").replace(/<script[\\s\\S]*?<\\/script>/gi," ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,180);throw new Error(clean||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
     'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
     'const response=await backupRequest({operation:"download",backup_type:"backup"});'
     'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
@@ -33,11 +71,11 @@ method = (
     'const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=match?match[1]:"OpenClash-backup.tar.gz";'
     'document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);V.value="备份已生成并下载"'
     '}catch(error){U(error)}finally{t.value=!1}}'
-    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value,archiveType=uploadType.value==="backup-file"||uploadType.value==="clash_meta",valid=archiveType?file.name.toLowerCase().endsWith(".tar.gz"): /\\.ya?ml$/i.test(file.name);if(!valid){U(new Error(archiveType?"此类型需要 .tar.gz 文件":"此类型需要 .yaml 或 .yml 文件"));return}const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
+    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value,archiveType=uploadType.value==="backup-file"||uploadType.value==="clash_meta",valid=uploadType.value==="backup-file"? /\\.tar(?:\\.gz)?$/i.test(file.name):uploadType.value==="clash_meta"?file.name.toLowerCase().endsWith(".tar.gz"): /\\.ya?ml$/i.test(file.name);if(!valid){U(new Error(archiveType?"所选文件后缀与上传类型不匹配":"此类型需要 .yaml 或 .yml 文件"));return}const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
     't.value=!0;V.value="正在安全导入备份";let started=!1;try{'
     'await backupRequest({operation:"start",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"});started=!0;'
-    'for(let offset=0;offset<file.size;offset+=262144){V.value="正在上传备份 "+Math.min(100,Math.round((offset+262144)/file.size*100))+"%";'
-    'await backupRequest({operation:"chunk",upload_id:id,filename:file.name,upload_type:uploadType.value,offset:String(offset)},{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file.slice(offset,offset+262144)})}'
+    'for(let offset=0;offset<file.size;offset+=65536){V.value="正在上传备份 "+Math.min(100,Math.round((offset+65536)/file.size*100))+"%";'
+    'await backupRequest({operation:"chunk",upload_id:id,filename:file.name,upload_type:uploadType.value,offset:String(offset)},{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file.slice(offset,offset+65536)})}'
     'const response=await backupRequest({operation:"finish",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"});const result=await response.json();'
     'if(result.status!=="success")throw new Error(result.message||"备份导入失败");started=!1;backupFile.value=null;await N();V.value=result.message||"备份已导入，OpenClash 保持关闭"'
     '}catch(error){if(started)try{await backupRequest({operation:"cancel",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"})}catch{}U(error)}finally{t.value=!1}}'
@@ -50,26 +88,43 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
-    's("div",{class:"flex flex-wrap items-center gap-2"},['
+    's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
     's("label",{for:"oc-backup-file-type",class:"text-sm text-muted"},"上传文件类型："),'
     's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
-    's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar.gz)")]),'
-    's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":".tar.gz,application/gzip",style:{display:"none"},'
+    's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar/.tar.gz)")]),'
+    's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
-    'm(i(p),{variant:"secondary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
+    'm(i(p),{variant:"primary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
     's("span",{class:"text-sm text-muted max-w-64 truncate"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[...e[63]||(e[63]=[d("上传",-1)])]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("备份")])]),_:1},8,["disabled"]),'
-    ']),'
+    ']),s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
 elif 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
+
+second_row = 's("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
+if second_row in page:
+    row_open = page.find(second_row) + len(second_row) - 1
+    try:
+        row_close = matching_delimiter(page, row_open)
+    except ValueError as error:
+        raise SystemExit(f"ERROR: unable to separate upload and file-management controls: {error}")
+    suffix = page[row_close + 1:]
+    if suffix.startswith(")])]"):
+        pass
+    elif suffix.startswith(")]"):
+        # The first ')' can close the new row; restore the enclosing Ql array
+        # and div before the page-level array and section are closed.
+        page = page[:row_close + 2] + "])" + page[row_close + 2:]
+    elif not suffix.startswith(")"):
+        page = page[:row_close + 1] + ")" + page[row_close + 1:]
 
 if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '上传文件类型' not in page or '未选择文件' not in page:
     raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '上传文件类型', '未选择文件') if marker not in page))
@@ -242,16 +297,18 @@ function action_higoros_upload()
 	local filename = HTTP.formvalue("filename") or ""
 	local upload_type = HTTP.formvalue("upload_type") or ""
 	if not id:match("^[a-f0-9]+$") or #id ~= 32 then return respond("error", "Invalid upload id") end
-	if not filename:match("^[%w_.%-]+$") or filename:match("^%.") then return respond("error", "Invalid upload filename") end
+	if #filename == 0 or #filename > 240 or filename == "." or filename == ".." or filename:match("^%.") or filename:find("/", 1, true) or filename:find("\\", 1, true) or filename:find("%c") then return respond("error", "文件名无效：不能包含路径分隔符或控制字符") end
+	local lower_filename = filename:lower()
 	local types = {
-		config = { dir = "/etc/openclash/config", suffix = filename:match("%.ya?ml$") and true },
-		["proxy-provider"] = { dir = "/etc/openclash/proxy_provider", suffix = filename:match("%.ya?ml$") and true },
-		["rule-provider"] = { dir = "/etc/openclash/rule_provider", suffix = filename:match("%.ya?ml$") and true },
-		clash_meta = { suffix = filename:match("%.tar%.gz$") and true },
-		["backup-file"] = { suffix = filename:match("%.tar%.gz$") and true }
+		config = { dir = "/etc/openclash/config", suffix = lower_filename:match("%.ya?ml$") and true },
+		["proxy-provider"] = { dir = "/etc/openclash/proxy_provider", suffix = lower_filename:match("%.ya?ml$") and true },
+		["rule-provider"] = { dir = "/etc/openclash/rule_provider", suffix = lower_filename:match("%.ya?ml$") and true },
+		clash_meta = { suffix = lower_filename:match("%.tar%.gz$") and true },
+		["backup-file"] = { suffix = (lower_filename:match("%.tar%.gz$") or lower_filename:match("%.tar$")) and true }
 	}
 	if not types[upload_type] or not types[upload_type].suffix then return respond("error", "文件名后缀与上传类型不匹配") end
-	local path = "/tmp/higoos_openclash_" .. id
+	local suffix = lower_filename:match("%.tar%.gz$") and ".tar.gz" or lower_filename:match("%.tar$") and ".tar" or ".upload"
+	local path = "/tmp/higoos_openclash_" .. id .. suffix
 	if operation == "start" then
 		local fp = io.open(path, "wb")
 		if not fp then return respond("error", "无法创建临时上传文件") end
@@ -260,7 +317,7 @@ function action_higoros_upload()
 	elseif operation == "chunk" then
 		local chunk = HTTP.content() or ""
 		local offset = tonumber(HTTP.formvalue("offset") or "")
-        if #chunk == 0 or #chunk > 262144 or not offset or offset < 0 then return respond("error", "上传数据块无效") end
+		if #chunk == 0 or #chunk > 65536 or not offset or offset < 0 then return respond("error", "上传数据块无效") end
 		local fp = io.open(path, "r+b")
 		if not fp then return respond("error", "上传已过期，请重新开始") end
 		local current = fp:seek("end") or 0
