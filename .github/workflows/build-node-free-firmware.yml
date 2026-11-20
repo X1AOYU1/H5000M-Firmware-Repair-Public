@@ -62,14 +62,16 @@ jobs:
         id: openclash_browser_audit
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+          AUDIT_DIR: ${{ runner.temp }}/higoos-openclash-audit
         run: |
+          mkdir -p "$AUDIT_DIR"
           set +e
-          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web output/openclash-entry-browser.txt > output/openclash-entry-browser-process.log 2>&1
+          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
           result=$?
-          if [ ! -f output/openclash-entry-browser.txt ]; then
-            cp output/openclash-entry-browser-process.log output/openclash-entry-browser.txt
+          if [ ! -f "$AUDIT_DIR/openclash-entry-browser.txt" ]; then
+            cp "$AUDIT_DIR/openclash-entry-browser-process.log" "$AUDIT_DIR/openclash-entry-browser.txt"
           fi
-          cat output/openclash-entry-browser-process.log
+          cat "$AUDIT_DIR/openclash-entry-browser-process.log"
           exit "$result"
         continue-on-error: true
       - name: Preserve OpenClash browser audit diagnostics
@@ -78,15 +80,15 @@ jobs:
         with:
           name: H5000M-openclash-browser-audit-${{ github.run_id }}
           path: |
-            output/openclash-entry-browser.txt
-            output/openclash-entry-browser-process.log
+            ${{ runner.temp }}/higoos-openclash-audit/openclash-entry-browser.txt
+            ${{ runner.temp }}/higoos-openclash-audit/openclash-entry-browser-process.log
           if-no-files-found: warn
           retention-days: 7
       - name: Require successful OpenClash browser audit
         if: always()
         run: |
           test "${{ steps.openclash_browser_audit.outcome }}" = success || test "${{ steps.openclash_browser_audit.conclusion }}" = success
-          grep -q '^PASS: HigoOS app-center OpenClash button was clicked' output/openclash-entry-browser.txt
+          grep -q '^PASS: HigoOS app-center OpenClash button was clicked' "${{ runner.temp }}/higoos-openclash-audit/openclash-entry-browser.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: H5000M-complete-repair-node-free-firmware
@@ -100,7 +102,7 @@ jobs:
             output/login-wallpaper-fix.txt
             output/openclash-backup-import.txt
             output/openclash-entry-route.txt
-            output/openclash-entry-browser.txt
+            ${{ runner.temp }}/higoos-openclash-audit/openclash-entry-browser.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
           retention-days: 30
