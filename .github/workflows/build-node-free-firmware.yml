@@ -26,6 +26,10 @@ jobs:
           cmake -S /tmp/fwtool-src -B /tmp/fwtool-build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/fwtool-build --parallel 2
           sudo install -m 0755 /tmp/fwtool-build/fwtool /usr/local/bin/fwtool
+      - name: Install headless browser for HigoOS click audit
+        run: |
+          npm install --prefix "$RUNNER_TEMP/higoos-ui-audit" --no-audit --no-fund playwright@1.52.0
+          "$RUNNER_TEMP/higoos-ui-audit/node_modules/.bin/playwright" install chromium
       - name: Download encrypted complete-repair baseline
         run: |
           mkdir -p input
@@ -50,6 +54,10 @@ jobs:
           python3 tests/openclash-backup-import.test.py
           python3 tests/openclash-entry-route.test.py
           sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
+      - name: Dynamically click OpenClash app-center entry
+        env:
+          PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+        run: node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web output/openclash-entry-browser.txt
       - uses: actions/upload-artifact@v4
         with:
           name: H5000M-complete-repair-node-free-firmware
@@ -63,6 +71,7 @@ jobs:
             output/login-wallpaper-fix.txt
             output/openclash-backup-import.txt
             output/openclash-entry-route.txt
+            output/openclash-entry-browser.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
           retention-days: 30
