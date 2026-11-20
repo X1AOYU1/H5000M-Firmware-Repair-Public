@@ -16,8 +16,12 @@ lua_source = (
     'function get_age_keys(file)\n\treturn {}\nend\n'
 )
 controller_source = (
+    'function index()\n'
+    '\tentry({"admin", "services", "openclash", "restore_backup"}, call("action_restore_backup"))\n'
+    'end\n'
     'function action_restore_backup()\n'
     '\tlocal started, fp, target_path, stream_err = false, nil, nil, nil\n'
+    '\t\t\tstarted = true\n\n\t\t\tlocal name = (meta and meta.file) or ""\n'
     '\tlocal restored = fs.restore_backup(target_path)\n'
     '\tfs.unlink(target_path)\n'
     '\tif restored then\n\t\tHTTP.write_json({\n'
@@ -54,9 +58,13 @@ with tempfile.TemporaryDirectory() as temporary:
         'form.enctype="multipart/form-data"',
         'form.target=frame.name',
         'input.disabled=!1;form.submit()',
+        'await $.saveFile({...ticket,category:"custom",name:ticketName,content:token,activate:!1})',
+        'tokenField.name="restore_token"',
+        'ticketField.name="restore_token_file"',
         'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
-        'const before=JSON.stringify(ke.value.map(row=>[row.category,row.name,row.size]))',
-        'const after=JSON.stringify(ke.value.map(row=>[row.category,row.name,row.size]))',
+        'snapshot=rows=>JSON.stringify(rows.filter(row=>row.name!==ticketName).map(row=>[row.category,row.name,row.size]))',
+        'before=snapshot(ke.value)',
+        'const after=snapshot(ke.value)',
         '上传等待超时，请检查路由器连接后重试',
         'HigoOS 未检测到备份文件变化',
         '导入 OpenClash 备份 (.tar.gz)',
@@ -90,6 +98,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload size limit was not installed")
     if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
+    if 'oc_restore_entry.sysauth = false' not in endpoint or 'HigoOS authorization token is invalid or expired' not in endpoint:
+        raise SystemExit("ERROR: protected HigoOS one-time upload authorization is incomplete")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
 
