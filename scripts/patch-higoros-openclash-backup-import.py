@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Add authenticated OpenClash backup import and export to HigoOS."""
 from pathlib import Path
+import re
 import sys
 
 
@@ -88,33 +89,69 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     toolbar_anchor +
-    's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}},"上传文件类型："),'
-    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
-    's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
-    's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar/.tar.gz)")]),'
+    's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"14px"}},"操作类型："),'
+    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"操作类型",class:"w-52 h-9 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-sm",onChange:e=>{uploadType.value=e.target.value;if(e.target.value.startsWith("create-"))ve.value=e.target.value.slice(7);backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
+    's("option",{value:"config"},"上传配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"上传代理文件"),s("option",{value:"rule-provider"},"上传规则集文件"),'
+    's("option",{value:"clash_meta"},"上传 ARM64 Meta 核心 (.tar.gz)"),s("option",{value:"backup-file"},"导入备份 (.tar/.tar.gz)"),s("option",{value:"backup-download"},"下载 OpenClash 备份"),'
+    's("option",{value:"create-config"},"新建主配置"),s("option",{value:"create-overwrite"},"新建覆写文件"),s("option",{value:"create-proxy-provider"},"新建代理提供者"),s("option",{value:"create-rule-provider"},"新建规则提供者"),s("option",{value:"create-custom"},"新建自定义文件")]),'
     's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
-    'm(i(p),{variant:"primary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0,backgroundColor:"#477fe0",borderColor:"#477fe0",color:"#fff"},disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
+    'm(i(p),{variant:"primary",class:"!h-9 !min-h-0 shrink-0 whitespace-nowrap !px-3 !py-1 text-sm",style:{margin:0,backgroundColor:"#477fe0",borderColor:"#477fe0",color:"#fff",display:uploadType.value.startsWith("create-")||uploadType.value==="backup-download"?"none":""},disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
-    's("span",{class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}},backupFile.value?.name||"未选择文件"),'
-    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value||!backupFile.value,onClick:uploadBackup},'
+    's("span",{class:"w-44 h-9 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-sm text-muted",style:{lineHeight:"26px",display:uploadType.value.startsWith("create-")||uploadType.value==="backup-download"?"none":""}},backupFile.value?.name||"未选择文件"),'
+    'm(i(p),{variant:"secondary",class:"!h-9 !min-h-0 shrink-0 whitespace-nowrap !px-3 !py-1 text-sm",style:{margin:0,display:uploadType.value.startsWith("create-")||uploadType.value==="backup-download"?"none":""},disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[d("↑ 上传",-1)]),_:1},8,["disabled"]),'
-    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("↓ 备份")]),_:1},8,["disabled"]),'
+    'm(i(p),{variant:"secondary",class:"!h-9 !min-h-0 shrink-0 whitespace-nowrap !px-3 !py-1 text-sm",style:{margin:0,display:uploadType.value==="backup-download"?"":"none"},disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("下载备份")]),_:1},8,["disabled"]),'
 )
+toolbar_controls = toolbar_replacement[len(toolbar_anchor):]
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
 elif 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
+toolbar_start = page.find('s("label",{for:"oc-backup-file-type"')
+toolbar_end_token = 'd("↓ 备份")]),_:1},8,["disabled"]),'
+if toolbar_start >= 0:
+    toolbar_end = page.find(toolbar_end_token, toolbar_start)
+    if toolbar_end >= 0:
+        toolbar_end += len(toolbar_end_token)
+    else:
+        toolbar_end_token = 'd("下载备份")]),_:1},8,["disabled"]),'
+        toolbar_end = page.find(toolbar_end_token, toolbar_start)
+        if toolbar_end < 0:
+            raise SystemExit("ERROR: existing OpenClash file toolbar end anchor changed")
+        toolbar_end += len(toolbar_end_token)
+    page = page[:toolbar_start] + toolbar_controls + page[toolbar_end:]
+elif '"aria-label":"操作类型"' not in page:
+    raise SystemExit("ERROR: OpenClash unified operation menu could not be installed")
 
-if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '上传文件类型' not in page or '未选择文件' not in page:
-    raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '上传文件类型', '未选择文件') if marker not in page))
+if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '操作类型' not in page or '未选择文件' not in page:
+    raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '操作类型', '未选择文件') if marker not in page))
 compact_row_anchor = 'Ql={class:"flex flex-wrap gap-3"}'
 compact_row = 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'
 if compact_row_anchor in page:
     page = page.replace(compact_row_anchor, compact_row, 1)
 elif compact_row not in page:
     raise SystemExit("ERROR: OpenClash native file toolbar layout anchor changed")
+
+new_type_select = re.compile(r'ie\(s\("select",\{"onUpdate:modelValue":e\[9\].*?\[\[sl,ve\.value\]\]\),')
+page, removed = new_type_select.subn("", page, count=1)
+if removed == 0 and '"aria-label":"新建类型"' in page:
+    raise SystemExit("ERROR: duplicate OpenClash file-type menu could not be removed")
+
+create_input = 'ie(s("input",{"onUpdate:modelValue":e[10]||(e[10]=l=>X.value=l),placeholder:"文件名.yaml",class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,512),[[ye,X.value]])'
+create_input_new = 'ie(s("input",{"onUpdate:modelValue":e[10]||(e[10]=l=>X.value=l),placeholder:"文件名.yaml",class:"h-9 w-44 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-sm",style:{display:uploadType.value.startsWith("create-")?"":"none"}},null,512),[[ye,X.value]])'
+if create_input in page:
+    page = page.replace(create_input, create_input_new, 1)
+elif create_input_new not in page:
+    raise SystemExit("ERROR: OpenClash create-file input anchor changed")
+
+create_button = 'm(i(p),{variant:"secondary",disabled:t.value||!X.value.trim(),onClick:Je},{default:r(()=>[...e[49]||(e[49]=[d("新建文件",-1)])]),_:1},8,["disabled"])'
+create_button_new = 'm(i(p),{variant:"secondary",class:"!h-9 !min-h-0 shrink-0 whitespace-nowrap !px-3 !py-1 text-sm",style:{display:uploadType.value.startsWith("create-")?"":"none"},disabled:t.value||!X.value.trim(),onClick:Je},{default:r(()=>[...e[49]||(e[49]=[d("新建文件",-1)])]),_:1},8,["disabled"])'
+if create_button in page:
+    page = page.replace(create_button, create_button_new, 1)
+elif create_button_new not in page:
+    raise SystemExit("ERROR: OpenClash create-file action anchor changed")
 pages[0].write_text(page, encoding="utf-8")
 
 source = lua.read_text(encoding="utf-8")
@@ -209,7 +246,7 @@ replacement = r'''function restore_backup(archive)
 						ok = ok and SYS.call("cp -f " .. UTIL.shellquote(staged_uci) .. " /etc/config/openclash") == 0
 					end
 					ok = ok and SYS.call("uci set openclash.config.config_path=" .. UTIL.shellquote("/etc/openclash/config/" .. selected)) == 0
-					ok = ok and SYS.call("uci set openclash.config.enable=0 && uci set openclash.config.core_type=Meta && uci set openclash.config.interface_name=br-lan && uci set openclash.config.lan_interface_name=br-lan && uci set openclash.config.en_mode=fake-ip-tun && uci set openclash.config.smart_enable=0 && uci set openclash.config.auto_smart_switch=0 && uci set openclash.config.smart_enable_lgbm=0 && uci -q delete openclash.config.stack_type && uci commit openclash") == 0
+					ok = ok and SYS.call("uci set openclash.config.enable=0 && uci set openclash.config.core_type=Meta && uci set openclash.config.core_version=linux-arm64 && uci set openclash.config.small_flash_memory=0 && uci set openclash.config.interface_name=br-lan && uci set openclash.config.lan_interface_name=br-lan && uci set openclash.config.en_mode=fake-ip-tun && uci set openclash.config.stack_type=system && uci set openclash.config.stack_type_v6=system && uci set openclash.config.smart_enable=0 && uci set openclash.config.auto_smart_switch=0 && uci set openclash.config.smart_enable_lgbm=0 && uci commit openclash") == 0
 					restored = ok
 					if not ok then failure = "配置或资源文件写入失败" end
 				end

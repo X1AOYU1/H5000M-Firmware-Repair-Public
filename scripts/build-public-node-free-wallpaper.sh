@@ -64,10 +64,15 @@ checks = {
 upload_ui = (
     'id:"oc-backup-file-type"' in openclash_page.read_text(encoding="utf-8")
     and all(value in openclash_page.read_text(encoding="utf-8") for value in (
-        '选择文件', '未选择文件', '↑ 上传', '↓ 备份',
+        '"aria-label":"操作类型"', 'value:"backup-download"',
+        'value:"create-config"', 'value:"create-overwrite"',
+        'value:"create-proxy-provider"', 'value:"create-rule-provider"',
+        'value:"create-custom"', '选择文件', '未选择文件', '↑ 上传', '下载备份',
+        'fontSize:"14px"', 'text-sm',
         'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
         'body:file.slice(offset,offset+65536)',
     ))
+    and '"aria-label":"新建类型"' not in openclash_page.read_text(encoding="utf-8")
     and 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash_page.read_text(encoding="utf-8")
     and '配置文件保存在配置目录（/etc/openclash/config）' not in openclash_page.read_text(encoding="utf-8")
 )
@@ -79,6 +84,10 @@ upload_backend = all(value in openclash_controller for value in (
 )) and all(value in openclash_lua for value in (
     'local allowfile = "/tmp/oc_restore.allow"',
     'uci set openclash.config.core_type=Meta',
+    'uci set openclash.config.core_version=linux-arm64',
+    'uci set openclash.config.small_flash_memory=0',
+    'uci set openclash.config.stack_type=system',
+    'uci set openclash.config.stack_type_v6=system',
     'uci set openclash.config.enable=0',
 ))
 checks["HigoOS single-row upload, backup, and safe restore"] = upload_ui and upload_backend
@@ -199,7 +208,8 @@ configs = Path(sys.argv[2])
 assert not (configs / "dy.yaml").exists() and not (configs / "127.0.0.1.yaml").exists()
 openclash = next(Path(sys.argv[3]).glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
 assert len(openclash) > 1000 and 'y("iframe"' not in openclash
-assert all(value in openclash for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '↑ 上传', '↓ 备份', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
+assert all(value in openclash for value in ('操作类型：', '上传配置文件 (.yaml)', '上传代理文件', '上传规则集文件', '上传 ARM64 Meta 核心 (.tar.gz)', '导入备份 (.tar/.tar.gz)', '下载 OpenClash 备份', '新建主配置', '新建覆写文件', '新建代理提供者', '新建规则提供者', '新建自定义文件', '选择文件', '未选择文件', '↑ 上传', '下载备份', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
+assert '"aria-label":"操作类型"' in openclash and '"aria-label":"新建类型"' not in openclash
 assert 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash
 assert '配置文件保存在配置目录（/etc/openclash/config）' not in openclash
 subscribe = (Path(sys.argv[4]) / "openclash.sh").read_text(encoding="utf-8")

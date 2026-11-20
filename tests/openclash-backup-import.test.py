@@ -43,7 +43,7 @@ def check_restore_archive_format(temporary):
 page_source = (
     'const Ql={class:"flex flex-wrap gap-3"};const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
     'async function Je(){return null}return()=>f.value==="files"?(o(),'
-    'y("section",Hl,[s("div",Ql,[s("select",null),s("input",null),s("button",null)])])):null}});'
+    'y("section",Hl,[s("div",Ql,[ie(s("select",{"onUpdate:modelValue":e[9]||(e[9]=l=>ve.value=l),"aria-label":"新建类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},[],512),[[sl,ve.value]]),ie(s("input",{"onUpdate:modelValue":e[10]||(e[10]=l=>X.value=l),placeholder:"文件名.yaml",class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,512),[[ye,X.value]]),m(i(p),{variant:"secondary",disabled:t.value||!X.value.trim(),onClick:Je},{default:r(()=>[...e[49]||(e[49]=[d("新建文件",-1)])]),_:1},8,["disabled"])])])):null}});'
 )
 lua_source = (
     'function restore_backup(archive)\n\treturn false\nend\n'
@@ -110,17 +110,25 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: the supplied H5000M .tar backup filename is not accepted")
     required_page = (
         'id:"oc-backup-file-type",value:uploadType.value',
+        '"aria-label":"操作类型"',
         'uploadType=g("config")',
         'value:"config"}',
         'value:"proxy-provider"}',
         'value:"rule-provider"}',
         'value:"clash_meta"}',
         'value:"backup-file"}',
-        '配置文件 (.yaml)',
-        '代理文件',
-        '规则集文件',
-        '[Meta] 内核文件 (.tar.gz)',
-        '备份文件 (.tar/.tar.gz)',
+        'value:"backup-download"}',
+        'value:"create-config"}',
+        'value:"create-overwrite"}',
+        'value:"create-proxy-provider"}',
+        'value:"create-rule-provider"}',
+        'value:"create-custom"}',
+        '上传配置文件 (.yaml)',
+        '上传代理文件',
+        '上传规则集文件',
+        '上传 ARM64 Meta 核心 (.tar.gz)',
+        '导入备份 (.tar/.tar.gz)',
+        '下载 OpenClash 备份',
         'uploadType.value==="backup-file"||uploadType.value==="clash_meta"',
         'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"}',
         'file.name):uploadType.value==="clash_meta"',
@@ -131,14 +139,14 @@ with tempfile.TemporaryDirectory() as temporary:
         'raw.replace(/<!--[\\s\\S]*?-->/g," ")',
         'replace(/<style[^]*?[/]style>/gi," ")',
         'backup_type:"backup"',
-        '上传文件类型：',
+        '操作类型：',
         '选择文件',
         '未选择文件',
         'd("↑ 上传",-1)',
-        'd("↓ 备份")',
-        'class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}',
-        'class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}',
-        'class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"',
+        'd("下载备份")',
+        'fontSize:"14px"',
+        'class:"w-44 h-9 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-sm text-muted"',
+        'class:"w-52 h-9 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-sm"',
         'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
         'application/octet-stream',
         'body:file.slice(offset,offset+65536)',
@@ -149,22 +157,32 @@ with tempfile.TemporaryDirectory() as temporary:
         'local allowfile = "/tmp/oc_restore.allow"',
         'category == "rule_provider"',
         'uci set openclash.config.core_type=Meta',
+        'uci set openclash.config.core_version=linux-arm64',
+        'uci set openclash.config.small_flash_memory=0',
         'uci set openclash.config.interface_name=br-lan',
         'uci set openclash.config.enable=0',
+        'uci set openclash.config.stack_type=system',
+        'uci set openclash.config.stack_type_v6=system',
         'china_ip6_route.ipset',
     )
     if any(marker not in page for marker in required_page):
         raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete: " + ", ".join(marker for marker in required_page if marker not in page))
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
-    if page.count("async function uploadBackup()") != 1 or page.count('d("↑ 上传",-1)') != 1 or page.count('d("↓ 备份")') != 1:
+    if page.count("async function uploadBackup()") != 1 or page.count('d("↑ 上传",-1)') != 1 or page.count('d("下载备份")') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if 'await $.saveFile(' in page or 'oc-backup-upload-frame' in page or 'restore_token_file' in page:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}') != 1 or page.count('class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}') != 1 or page.count('class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"') != 1 or page.count('Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}') != 1 or 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' in page or '配置文件保存在配置目录（/etc/openclash/config）' in page:
-        raise SystemExit("ERROR: OpenClash upload toolbar does not match the native compact layout")
+    if page.count('"aria-label":"操作类型"') != 1:
+        raise SystemExit("ERROR: unified operation menu is missing or duplicated")
+    if page.count('"aria-label":"新建类型"') != 0:
+        raise SystemExit("ERROR: duplicate new-file type menu remains")
+    if page.count('id:"oc-backup-file-type"') != 1:
+        raise SystemExit("ERROR: unified operation menu control is duplicated")
+    if page.count('Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}') != 1 or '配置文件保存在配置目录（/etc/openclash/config）' in page:
+        raise SystemExit("ERROR: OpenClash operation controls do not use the native compact row")
     if page.count('s("div",Ql,[') != 1 or 's("div",{class:"flex w-full flex-wrap' in page:
         raise SystemExit("ERROR: OpenClash file creation and upload controls are not in one row")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
@@ -203,5 +221,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: restore depends on unavailable ipairs instead of Lua numeric iteration")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
+    if 'uci -q delete openclash.config.stack_type' in backend:
+        raise SystemExit("ERROR: H5000M restore deletes stack_type and falls back to OpenClash's MIPS default")
 
 print("PASS: HigoOS backup upload is idempotent and restore filters incompatible donor assets")
