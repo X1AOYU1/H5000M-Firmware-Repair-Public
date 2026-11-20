@@ -14,6 +14,7 @@ unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
 
 python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openclash-node-cleanup.txt"
 python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
+python3 scripts/patch-higoros-openclash-entry.py "$OUT/rootfs" | tee "$OUT/openclash-entry-route.txt"
 
 # Apply the current login-page fix and revise every SPA asset URL afterward.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
@@ -34,6 +35,8 @@ security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 openclash_page = next(assets.glob("OpenClashPage-*.js"))
 openclash_lua = (root / "usr/lib/lua/luci/openclash.lua").read_text(encoding="utf-8")
+plugin_page = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
+app_router = next(assets.glob("index-*.js")).read_text(encoding="utf-8")
 package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
@@ -44,6 +47,7 @@ checks = {
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and 'y("iframe"' not in openclash_page.read_text(encoding="utf-8"),
+    "OpenClash app-center button uses its HigoOS route": 'String(t.featureKey||t.name||"").toLowerCase().replace(/^luci-app-/,"")==="openclash"?{path:"/apps/openclash"}' in plugin_page and 'path:"apps/openclash"' in app_router,
     "HigoOS native-style upload toolbar and safe restore": all(value in openclash_page.read_text(encoding="utf-8") for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '上传', '备份', 'class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}', 'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[', 'application/octet-stream', 'body:file.slice(offset,offset+65536)', 'valid=uploadType.value==="backup-file"? /\\.tar(?:\\.gz)?$/i.test(file.name)', 'raw.replace(/<!--[\\s\\S]*?-->/g," ")')) and '/cgi-bin/luci/higoros/openclash/' in openclash_page.read_text(encoding="utf-8") and 'local allowfile = "/tmp/oc_restore.allow"' in openclash_lua and 'uci set openclash.config.core_type=Meta' in openclash_lua and 'uci set openclash.config.enable=0' in openclash_lua and all(value in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8") for value in ('HTTP.getenv("HTTP_COOKIE")', 'HTTP.getenv("HTTP_ORIGIN")', 'HTTP.getenv("HTTP_REFERER")', 'source_host == host', 'function action_higoros_backup()', 'backup = action_backup', 'function action_higoros_upload()', 'HTTP.content()', '#chunk > 65536', 'lower_filename = filename:lower()', 'filename:find("/", 1, true)', 'filename:find("\\\\", 1, true)', 'Backup must be a .tar or .tar.gz archive', 'lower_filename:match("%.tar$")', 'entry({"higoros", "openclash", "backup"}', 'higoros_backup_entry.sysauth = false', 'entry({"higoros", "openclash", "upload"}', 'higoros_upload_entry.sysauth = false')) and 'Backup archive exceeds 128 MiB limit' in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8"),
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
@@ -95,6 +99,8 @@ login_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type
 node --check "$login_asset"
 openclash_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type f -name 'OpenClashPage-*.js' -print -quit)"
 node --check "$openclash_asset"
+plugins_asset="$(find "$OUT/rootfs/usr/share/higoros/web/assets" -maxdepth 1 -type f -name 'PluginsPage-*.js' -print -quit)"
+node --check "$plugins_asset"
 new_root="$OUT/rootfs.repaired"
 mksquashfs "$OUT/rootfs" "$new_root" -noappend -comp xz -b 262144 -no-xattrs -processors 2 >/dev/null
 python3 - "$IMAGE" "$root" "$new_root" "$OUT/repaired.tar" <<'PY'
@@ -140,6 +146,17 @@ tar -xf "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" -C "$OUT/final-tar"
 final_root="$(find "$OUT/final-tar" -type f -name root -print -quit)"
 unsquashfs -no-progress -d "$OUT/final-root" "$final_root" >/dev/null
 grep -q 'higoos-login-wallpaper\.' "$OUT/final-root/usr/share/higoros/web/assets/"LoginPage-*.js
+python3 - "$OUT/final-root/usr/share/higoros/web/assets" <<'PY'
+from pathlib import Path
+import sys
+
+assets = Path(sys.argv[1])
+plugins = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
+router = next(assets.glob("index-*.js")).read_text(encoding="utf-8")
+assert 'String(t.featureKey||t.name||"").toLowerCase().replace(/^luci-app-/,"")==="openclash"?{path:"/apps/openclash"}' in plugins
+assert 'path:"apps/openclash"' in router
+print("PASS: final firmware app-center OpenClash route points to the registered HigoOS page")
+PY
 python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" "$OUT/final-root/usr/share/higoros/web/assets" <<'PY'
 from pathlib import Path
 import re

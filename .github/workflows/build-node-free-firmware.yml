@@ -48,6 +48,7 @@ jobs:
           node --input-type=module --check < scripts/higoos-wallpaper-crop.js
           python3 tests/openclash-cleanup.test.py
           python3 tests/openclash-backup-import.test.py
+          python3 tests/openclash-entry-route.test.py
           sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - uses: actions/upload-artifact@v4
         with:
@@ -61,6 +62,7 @@ jobs:
             output/metadata-extracted.json
             output/login-wallpaper-fix.txt
             output/openclash-backup-import.txt
+            output/openclash-entry-route.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
           retention-days: 30
