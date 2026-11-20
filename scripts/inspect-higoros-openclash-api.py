@@ -10,6 +10,11 @@ output = Path(sys.argv[2])
 assets = root / "usr/share/higoros/web/assets"
 report = []
 
+for path in sorted(assets.glob("OpenClashPage-*.js")):
+    report.append(f"## Full native OpenClash bundle: {path.name}\n")
+    report.append(path.read_text(encoding="utf-8", errors="ignore"))
+    report.append("\n")
+
 for path in sorted(assets.glob("*.js")):
     text = path.read_text(encoding="utf-8", errors="ignore")
     needles = ("/api/v1/openclash", "openclash/file", "openclash/actions", "multipart/form-data")
