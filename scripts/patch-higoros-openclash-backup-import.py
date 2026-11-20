@@ -36,8 +36,10 @@ method = (
     'frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;'
     'const result=await new Promise((resolve,reject)=>{'
     'const timer=setTimeout(()=>reject(new Error("上传等待超时，请检查路由器连接后重试")),300000);'
-    'frame.onload=()=>{clearTimeout(timer);try{const text=frame.contentDocument.body.textContent||"";'
-    'const data=JSON.parse(text);if(data.status!=="success")reject(new Error(data.message||"备份导入失败"));'
+    'frame.onload=()=>{clearTimeout(timer);try{const text=frame.contentDocument.body.textContent||"";let data;'
+    'try{data=JSON.parse(text)}catch{const message=text.replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim();'
+    'throw new Error((message||"服务器返回了非 JSON 响应").slice(0,600))};'
+    'if(data.status!=="success")reject(new Error(data.message||"备份导入失败"));'
     'else resolve(data)}catch(error){reject(error)}};form.submit()});'
     'backupFile.value=null;V.value=result.message||"备份已导入，OpenClash 保持关闭";await N()'
     '}catch(error){U(error)}finally{if(input&&parent){if(input.parentNode===form)form.removeChild(input);'
@@ -199,5 +201,24 @@ handler = handler.replace(
     "\tif stream_err then\n\t\tif fp then fp:close(); fp = nil end\n\t\tif target_path then",
     1,
 )
+restore_call = "\tlocal restored = fs.restore_backup(target_path)\n\tfs.unlink(target_path)"
+restore_call_safe = (
+    "\tlocal restore_ok, restored = pcall(fs.restore_backup, target_path)\n"
+    "\tfs.unlink(target_path)"
+)
+if restore_call in handler:
+    handler = handler.replace(restore_call, restore_call_safe, 1)
+elif "local restore_ok, restored = pcall(fs.restore_backup, target_path)" not in handler:
+    raise SystemExit("ERROR: OpenClash restore call changed")
+success_branch = "\tif restored then\n\t\tHTTP.write_json({"
+safe_branch = (
+    "\tif not restore_ok then\n"
+    "\t\tHTTP.write_json({ status = \"error\", message = \"Backup restore error: \" .. tostring(restored):sub(1, 512) })\n"
+    "\telseif restored then\n\t\tHTTP.write_json({"
+)
+if success_branch in handler:
+    handler = handler.replace(success_branch, safe_branch, 1)
+elif 'message = "Backup restore error: " .. tostring(restored):sub(1, 512)' not in handler:
+    raise SystemExit("ERROR: OpenClash restore response branch changed")
 controller.write_text(controller_source[:handler_start] + handler + controller_source[handler_end:], encoding="utf-8")
 print("PASS: HigoOS backup import added; restore filters donor core/cache/geo, pins H5000M Meta settings, and leaves OpenClash disabled")

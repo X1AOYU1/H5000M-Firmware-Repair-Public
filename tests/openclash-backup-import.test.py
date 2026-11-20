@@ -18,6 +18,9 @@ lua_source = (
 controller_source = (
     'function action_restore_backup()\n'
     '\tlocal started, fp, target_path, stream_err = false, nil, nil, nil\n'
+    '\tlocal restored = fs.restore_backup(target_path)\n'
+    '\tfs.unlink(target_path)\n'
+    '\tif restored then\n\t\tHTTP.write_json({\n'
     '\t\t\ttarget_path = backup_dir .. name\n'
     '\t\tif chunk and fp then\n\t\t\tfp:write(chunk)\n\t\tend\n'
     '\tif stream_err then\n\t\tif target_path then\n'
@@ -53,6 +56,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
         'frame.contentDocument.body.textContent',
         '上传等待超时，请检查路由器连接后重试',
+        '服务器返回了非 JSON 响应',
         '导入 OpenClash 备份 (.tar.gz)',
         '/cgi-bin/luci/admin/services/openclash/restore_backup',
     )
@@ -78,6 +82,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
+    if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
+        raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
 
