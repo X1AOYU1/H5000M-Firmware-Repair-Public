@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add a filtered OpenClash backup importer to HigoOS and LuCI."""
+"""Add authenticated OpenClash backup import and export to HigoOS."""
 from pathlib import Path
 import sys
 
@@ -14,8 +14,8 @@ if len(pages) != 1 or not lua.is_file() or not controller.is_file():
 
 page = pages[0].read_text(encoding="utf-8")
 state_anchor = 've=g("config"),X=g(""),he=W(()=>'
-state_replacement = 've=g("config"),X=g(""),backupFile=g(null),he=W(()=>'
-if 'backupFile=g(null),he=W(()=>' in page:
+state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),backupType=g("backup"),he=W', 1)
+if 'backupFile=g(null),backupType=g("backup"),he=W(()=>' in page:
     pass
 elif page.count(state_anchor) == 1:
     page = page.replace(state_anchor, state_replacement, 1)
@@ -24,6 +24,14 @@ else:
 
 method_anchor = 'async function Je(){'
 method = (
+    'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
+    'const response=await fetch("/cgi-bin/luci/admin/services/openclash/higoros_backup?backup_type="+encodeURIComponent(backupType.value),{credentials:"same-origin"});'
+    'if(!response.ok){const message=await response.text();throw new Error(message||"备份生成失败（HTTP "+response.status+")")} '
+    'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
+    'const match=(response.headers.get("Content-Disposition")||"").match(/filename="?([^";]+)"?/i);'
+    'const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=match?match[1]:"OpenClash-backup.tar.gz";'
+    'document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);V.value="备份已生成并下载"'
+    '}catch(error){U(error)}finally{t.value=!1}}'
     'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;'
     't.value=!0;V.value="正在安全导入备份";try{'
     'const form=new FormData();form.append("backup_file",file,file.name);'
@@ -48,6 +56,11 @@ toolbar_replacement = (
     '{default:r(()=>[d(backupFile.value?.name||"选择备份文件",-1)]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[...e[63]||(e[63]=[d("导入 OpenClash 备份 (.tar / .tar.gz)",-1)])]),_:1},8,["disabled"]),'
+    's("select",{value:backupType.value,disabled:t.value,"aria-label":"备份范围",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>backupType.value=e.target.value},['
+    's("option",{value:"backup"},"完整备份"),s("option",{value:"backup_ex_core"},"备份，不含内核"),'
+    's("option",{value:"backup_only_config"},"仅配置"),s("option",{value:"backup_only_rule"},"仅规则提供者"),'
+    's("option",{value:"backup_only_proxy"},"仅代理提供者"),s("option",{value:"backup_only_core"},"仅内核")]),'
+    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("生成备份")])]),_:1},8,["disabled"]),'
 )
 if '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
@@ -155,16 +168,74 @@ end
 lua.write_text(source[:start] + replacement + source[end:], encoding="utf-8")
 
 controller_source = controller.read_text(encoding="utf-8")
+session_anchor = 'local fs = require "luci.openclash"\n'
+session_helper = r'''local function higoros_session_valid()
+	local cookie = HTTP.getenv("HTTP_COOKIE") or ""
+	local lan_ip = SYS.exec("uci -q get network.lan.ipaddr 2>/dev/null") or ""
+	lan_ip = lan_ip:match("([0-9]+%.[0-9]+%.[0-9]+%.[0-9]+)")
+	if #cookie > 8192 or not cookie:find("higo%-mesh%-view%-") or not lan_ip then return false end
+	local status = SYS.exec("curl --noproxy '*' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%{http_code}' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")
+	return status and status:match("(%d%d%d)") == "200"
+end
+'''
+if session_anchor in controller_source and "local function higoros_session_valid()" not in controller_source:
+    controller_source = controller_source.replace(session_anchor, session_anchor + session_helper, 1)
+elif "local function higoros_session_valid()" not in controller_source:
+    raise SystemExit("ERROR: OpenClash HigoOS session validation anchor changed")
+backup_route_anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
+backup_route = (
+    'entry({"admin", "services", "openclash", "higoros_backup"}, call("action_higoros_backup"))'
+)
+backup_route_auth = (
+    'local higoros_backup_entry = ' + backup_route + '\n'
+    'higoros_backup_entry.leaf = true\n'
+    'higoros_backup_entry.sysauth = false'
+)
+if 'higoros_backup_entry.sysauth = false' not in controller_source:
+    if controller_source.count(backup_route_anchor) == 1:
+        controller_source = controller_source.replace(backup_route_anchor, backup_route + "\n\t" + backup_route_anchor, 1)
+    if backup_route not in controller_source:
+        raise SystemExit("ERROR: OpenClash backup route anchor changed")
+    controller_source = controller_source.replace(backup_route, backup_route_auth, 1)
+backup_action_anchor = "\nfunction action_backup()"
+backup_action = r'''
+function action_higoros_backup()
+	if not higoros_session_valid() then
+		HTTP.prepare_content("application/json")
+		HTTP.write_json({ status = "error", message = "HigoOS session is invalid or expired; sign in again" })
+		return
+	end
+	local actions = {
+		backup = action_backup,
+		backup_ex_core = action_backup_ex_core,
+		backup_only_config = action_backup_only_config,
+		backup_only_rule = action_backup_only_rule,
+		backup_only_proxy = action_backup_only_proxy,
+		backup_only_core = action_backup_only_core
+	}
+	local action = actions[HTTP.formvalue("backup_type") or ""]
+	if not action then
+		HTTP.prepare_content("application/json")
+		HTTP.write_json({ status = "error", message = "Unsupported backup type" })
+		return
+	end
+	return action()
+end
+'''
+if backup_action_anchor in controller_source and "function action_higoros_backup()" not in controller_source:
+    controller_source = controller_source.replace(backup_action_anchor, "\n" + backup_action + backup_action_anchor, 1)
+elif "function action_higoros_backup()" not in controller_source:
+    raise SystemExit("ERROR: OpenClash backup action insertion anchor changed")
 route_anchor = 'entry({"admin", "services", "openclash", "restore_backup"}, call("action_restore_backup"))'
 route_replacement = (
     'local oc_restore_entry = ' + route_anchor + '\n'
     'oc_restore_entry.leaf = true\n'
     'oc_restore_entry.sysauth = false'
 )
-if route_anchor in controller_source:
+if 'oc_restore_entry.sysauth = false' not in controller_source:
+    if route_anchor not in controller_source:
+        raise SystemExit("ERROR: OpenClash backup route registration changed")
     controller_source = controller_source.replace(route_anchor, route_replacement, 1)
-elif 'oc_restore_entry.sysauth = false' not in controller_source:
-    raise SystemExit("ERROR: OpenClash backup route registration changed")
 handler_start = controller_source.find("function action_restore_backup()")
 handler_end = controller_source.find("\nfunction action_config_file_read", handler_start)
 if handler_start < 0 or handler_end < 0:
@@ -178,14 +249,7 @@ elif "local started, fp, target_path, stream_err, file_size" not in handler:
 auth_anchor = '\t\t\tstarted = true\n\n\t\t\tlocal name = (meta and meta.file) or ""'
 auth_check = (
     '\t\t\tstarted = true\n\n'
-    '\t\t\tlocal cookie = HTTP.getenv("HTTP_COOKIE") or ""\n'
-    '\t\t\tlocal lan_ip = SYS.exec("uci -q get network.lan.ipaddr 2>/dev/null") or ""\n'
-    '\t\t\tlan_ip = lan_ip:match("([0-9]+%.[0-9]+%.[0-9]+%.[0-9]+)")\n'
-    '\t\t\tlocal auth_status\n'
-    '\t\t\tif #cookie <= 8192 and cookie:find("higo%-mesh%-view%-") and lan_ip then\n'
-    '\t\t\t\tauth_status = SYS.exec("curl --noproxy \'*\' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w \'%{http_code}\' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")\n'
-    '\t\t\tend\n'
-    '\t\t\tif not auth_status or auth_status:match("(%d%d%d)") ~= "200" then\n'
+    '\t\t\tif not higoros_session_valid() then\n'
     '\t\t\t\tstream_err = "HigoOS session is invalid or expired; sign in again"\n'
     '\t\t\t\treturn\n'
     '\t\t\tend\n\n'

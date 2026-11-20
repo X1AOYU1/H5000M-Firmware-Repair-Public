@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 
@@ -9,16 +10,27 @@ repo = Path(__file__).resolve().parents[1]
 page_source = (
     'const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
     'async function Je(){return null}return()=>f.value==="files"?(o(),'
-    'y("section",Hl,[s("div",Ql,[s("button",null)]))}});'
+    'y("section",Hl,[s("div",Ql,[s("button",null)])])):null}});'
 )
 lua_source = (
     'function restore_backup(archive)\n\treturn false\nend\n'
     'function get_age_keys(file)\n\treturn {}\nend\n'
 )
 controller_source = (
+    'local SYS = require "luci.sys"\n'
+    'local HTTP = require "luci.http"\n'
+    'local UTIL = require "luci.util"\n'
+    'local fs = require "luci.openclash"\n'
     'function index()\n'
+    '\tentry({"admin", "services", "openclash", "backup"}, call("action_backup"))\n'
     '\tentry({"admin", "services", "openclash", "restore_backup"}, call("action_restore_backup"))\n'
     'end\n'
+    'function action_backup()\nend\n'
+    'function action_backup_ex_core()\nend\n'
+    'function action_backup_only_config()\nend\n'
+    'function action_backup_only_rule()\nend\n'
+    'function action_backup_only_proxy()\nend\n'
+    'function action_backup_only_core()\nend\n'
     'function action_restore_backup()\n'
     '\tlocal started, fp, target_path, stream_err = false, nil, nil, nil\n'
     '\t\t\tstarted = true\n\n\t\t\tlocal name = (meta and meta.file) or ""\n'
@@ -49,12 +61,27 @@ with tempfile.TemporaryDirectory() as temporary:
     subprocess.run([sys.executable, str(patcher), str(root)], check=True)
 
     page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
+    node = shutil.which("node")
+    if node:
+        subprocess.run([node, "--check", str(next(assets.glob("OpenClashPage-*.js")))], check=True)
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
         'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"选择备份文件"',
+        'async function downloadBackup()',
+        'backupType=g("backup")',
+        'backup_type="+encodeURIComponent(backupType.value)',
+        '导入 OpenClash 备份 (.tar / .tar.gz)',
+        '备份范围',
+        '生成备份',
+        'value:"backup"}',
+        'value:"backup_ex_core"}',
+        'value:"backup_only_config"}',
+        'value:"backup_only_rule"}',
+        'value:"backup_only_proxy"}',
+        'value:"backup_only_core"}',
         'const form=new FormData();form.append("backup_file",file,file.name)',
         'credentials:"same-origin",body:form',
         'const response=await fetch("/cgi-bin/luci/admin/services/openclash/restore_backup"',
@@ -87,10 +114,20 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload size limit was not installed")
     if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
-    if 'oc_restore_entry.sysauth = false' not in endpoint or 'HTTP.getenv("HTTP_COOKIE")' not in endpoint or 'HigoOS session is invalid or expired' not in endpoint:
+    if 'oc_restore_entry.sysauth = false' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint or 'HTTP.getenv("HTTP_COOKIE")' not in endpoint or 'HigoOS session is invalid or expired' not in endpoint:
         raise SystemExit("ERROR: HigoOS cookie-session authorization is incomplete")
     if 'curl --noproxy' not in endpoint or 'Cookie: " .. cookie' not in endpoint or '/api/v1/auth/me' not in endpoint:
         raise SystemExit("ERROR: upload endpoint does not validate the HigoOS session")
+    backup_actions = (
+        'backup = action_backup',
+        'backup_ex_core = action_backup_ex_core',
+        'backup_only_config = action_backup_only_config',
+        'backup_only_rule = action_backup_only_rule',
+        'backup_only_proxy = action_backup_only_proxy',
+        'backup_only_core = action_backup_only_core',
+    )
+    if 'function action_higoros_backup()' not in endpoint or any(action not in endpoint for action in backup_actions):
+        raise SystemExit("ERROR: native backup generation options are not exposed to HigoOS")
     if 'Backup must be a .tar or .tar.gz archive' not in endpoint:
         raise SystemExit("ERROR: .tar backup support is missing")
     if 'tar_list_options = gzip_archive and "tzf " or "tf "' not in backend or 'tar_extract_options = gzip_archive and "-xzf " or "-xf "' not in backend:
