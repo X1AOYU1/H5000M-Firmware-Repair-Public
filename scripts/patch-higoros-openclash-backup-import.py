@@ -27,7 +27,7 @@ method = (
     'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;'
     't.value=!0;V.value="正在安全导入备份";let input,form,frame,parent,next,ticket,ticketName,token,snapshot,before;try{'
     'token=Array.from(crypto.getRandomValues(new Uint8Array(24)),value=>value.toString(16).padStart(2,"0")).join("");'
-    'ticketName="openclash_custom_restore_auth_"+token+".list";'
+    'ticketName="openclash_custom_restore_auth_"+token+".yaml";'
     'snapshot=rows=>JSON.stringify(rows.filter(row=>row.name!==ticketName).map(row=>[row.category,row.name,row.size]));'
     'before=snapshot(ke.value);ticket=await $.file("custom",ticketName);'
     'await $.saveFile({...ticket,category:"custom",name:ticketName,content:token,activate:!1});'
@@ -61,17 +61,17 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
-    's("input",{id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",style:{display:"none"},'
+    's("input",{id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["onChange"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d(backupFile.value?.name||"选择备份文件",-1)]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
-    '{default:r(()=>[...e[63]||(e[63]=[d("导入 OpenClash 备份 (.tar.gz)",-1)])]),_:1},8,["disabled"]),'
+    '{default:r(()=>[...e[63]||(e[63]=[d("导入 OpenClash 备份 (.tar / .tar.gz)",-1)])]),_:1},8,["disabled"]),'
 )
-if '导入 OpenClash 备份 (.tar.gz)' not in page and page.count(toolbar_anchor) == 1:
+if '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
-elif '导入 OpenClash 备份 (.tar.gz)' not in page:
+elif '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
 
 if '/cgi-bin/luci/admin/services/openclash/restore_backup' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page:
@@ -89,10 +89,14 @@ replacement = r'''function restore_backup(archive)
 	local allowfile = "/tmp/oc_restore.allow"
 	local stage = "/tmp/oc_restore_stage"
 	local restored = false
-	local tarok = SYS.call("tar tzf " .. quoted .. " >" .. listfile .. " 2>/dev/null") == 0
+	local gzip_archive = archive:match("%.tar%.gz$") ~= nil
+	local tar_list_options = gzip_archive and "tzf " or "tf "
+	local tar_verbose_options = gzip_archive and "tvzf " or "tvf "
+	local tar_extract_options = gzip_archive and "-xzf " or "-xf "
+	local tarok = SYS.call("tar " .. tar_list_options .. quoted .. " >" .. listfile .. " 2>/dev/null") == 0
 	local has_profile, unsafe = false, false
 	local allowed, count = {}, 0
-	local unsafe_types = SYS.call("tar tvzf " .. quoted .. " 2>/dev/null | grep -qE '^[bcp lhs]'") == 0
+	local unsafe_types = SYS.call("tar " .. tar_verbose_options .. quoted .. " 2>/dev/null | grep -qE '^[bcp lhs]'") == 0
 	if tarok and not unsafe_types then
 		for line in io.lines(listfile) do
 			line = line:gsub("/$", "")
@@ -118,7 +122,7 @@ replacement = r'''function restore_backup(archive)
 			for _, path in ipairs(allowed) do allow:write(path, "\n") end
 			allow:close()
 			SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " && mkdir -p " .. UTIL.shellquote(stage))
-			if SYS.call("tar -C " .. UTIL.shellquote(stage) .. " -xzf " .. quoted .. " -T " .. UTIL.shellquote(allowfile) .. " >/dev/null 2>&1") == 0 then
+			if SYS.call("tar -C " .. UTIL.shellquote(stage) .. " " .. tar_extract_options .. quoted .. " -T " .. UTIL.shellquote(allowfile) .. " >/dev/null 2>&1") == 0 then
 				local config_dir = stage .. "/config"
 				local selected
 				local staged_uci = stage .. "/openclash"
@@ -197,7 +201,7 @@ auth_check = (
     '\t\t\tlocal token_name = HTTP.formvalue("restore_token_file") or ""\n'
     '\t\t\tlocal token_value = HTTP.formvalue("restore_token") or ""\n'
     '\t\t\tlocal token_path\n'
-    '\t\t\tif token_name:match("^openclash_custom_restore_auth_[a-f0-9]+%.list$") then\n'
+    '\t\t\tif token_name:match("^openclash_custom_restore_auth_[a-f0-9]+%.yaml$") then\n'
     '\t\t\t\ttoken_path = "/etc/openclash/custom/" .. token_name\n'
     '\t\t\tend\n'
     '\t\t\tlocal token_stat = token_path and fs.stat(token_path)\n'
@@ -215,14 +219,14 @@ elif 'HigoOS authorization token is invalid or expired' not in handler:
     raise SystemExit("ERROR: OpenClash upload authorization anchor changed")
 filename_anchor = "\t\t\ttarget_path = backup_dir .. name"
 filename_check = (
-    "\t\t\tif not name:match(\"%.tar%.gz$\") then\n"
-    "\t\t\t\tstream_err = \"Backup must be a .tar.gz archive\"\n"
+    "\t\t\tif not name:match(\"%.tar%.gz$\") and not name:match(\"%.tar$\") then\n"
+    "\t\t\t\tstream_err = \"Backup must be a .tar or .tar.gz archive\"\n"
     "\t\t\t\treturn\n"
     "\t\t\tend\n\n" + filename_anchor
 )
-if filename_anchor in handler and "Backup must be a .tar.gz archive" not in handler:
+if filename_anchor in handler and "Backup must be a .tar or .tar.gz archive" not in handler:
     handler = handler.replace(filename_anchor, filename_check, 1)
-elif "Backup must be a .tar.gz archive" not in handler:
+elif "Backup must be a .tar or .tar.gz archive" not in handler:
     raise SystemExit("ERROR: OpenClash backup filename validation anchor changed")
 chunk_write = "\t\tif chunk and fp then\n\t\t\tfp:write(chunk)\n\t\tend"
 chunk_limited = (

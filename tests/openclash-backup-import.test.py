@@ -52,13 +52,14 @@ with tempfile.TemporaryDirectory() as temporary:
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
-        'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",style:{display:"none"}',
+        'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"选择备份文件"',
         'form.enctype="multipart/form-data"',
         'form.target=frame.name',
         'input.disabled=!1;form.submit()',
         'await $.saveFile({...ticket,category:"custom",name:ticketName,content:token,activate:!1})',
+        'ticketName="openclash_custom_restore_auth_"+token+".yaml"',
         'tokenField.name="restore_token"',
         'ticketField.name="restore_token_file"',
         'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
@@ -67,7 +68,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'const after=snapshot(ke.value)',
         '上传等待超时，请检查路由器连接后重试',
         'HigoOS 未检测到备份文件变化',
-        '导入 OpenClash 备份 (.tar.gz)',
+        '导入 OpenClash 备份 (.tar / .tar.gz)',
         '/cgi-bin/luci/admin/services/openclash/restore_backup',
     )
     required_backend = (
@@ -82,7 +83,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete")
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
-    if page.count("async function uploadBackup()") != 1 or page.count('导入 OpenClash 备份 (.tar.gz)') != 1:
+    if page.count("async function uploadBackup()") != 1 or page.count('导入 OpenClash 备份 (.tar / .tar.gz)') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if "fetch(\"/cgi-bin/luci/admin/services/openclash/restore_backup\"" in page:
         raise SystemExit("ERROR: backup upload still uses fetch against the LuCI CGI endpoint")
@@ -92,7 +93,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup iframe load handler is registered after insertion")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if 'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:' in page:
+    if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
@@ -100,6 +101,10 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
     if 'oc_restore_entry.sysauth = false' not in endpoint or 'HigoOS authorization token is invalid or expired' not in endpoint:
         raise SystemExit("ERROR: protected HigoOS one-time upload authorization is incomplete")
+    if 'Backup must be a .tar or .tar.gz archive' not in endpoint or 'token_name:match("^openclash_custom_restore_auth_[a-f0-9]+%.yaml$")' not in endpoint:
+        raise SystemExit("ERROR: .tar backup support or supported authorization filename is missing")
+    if 'tar_list_options = gzip_archive and "tzf " or "tf "' not in backend or 'tar_extract_options = gzip_archive and "-xzf " or "-xf "' not in backend:
+        raise SystemExit("ERROR: .tar and .tar.gz extraction modes are incomplete")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
 
