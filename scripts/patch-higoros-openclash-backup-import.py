@@ -50,6 +50,7 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
+    's("div",{class:"flex flex-wrap items-center gap-2"},['
     's("input",{id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["onChange"]),'
@@ -62,6 +63,7 @@ toolbar_replacement = (
     's("option",{value:"backup_only_config"},"仅配置"),s("option",{value:"backup_only_rule"},"仅规则提供者"),'
     's("option",{value:"backup_only_proxy"},"仅代理提供者"),s("option",{value:"backup_only_core"},"仅内核")]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("生成备份")])]),_:1},8,["disabled"]),'
+    ']),'
 )
 if '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)

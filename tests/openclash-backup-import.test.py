@@ -76,6 +76,7 @@ with tempfile.TemporaryDirectory() as temporary:
         '导入 OpenClash 备份 (.tar / .tar.gz)',
         '备份范围',
         '生成备份',
+        'class:"flex flex-wrap items-center gap-2"',
         'value:"backup"}',
         'value:"backup_ex_core"}',
         'value:"backup_only_config"}',
@@ -106,6 +107,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
+    if page.count('class:"flex flex-wrap items-center gap-2"') != 1:
+        raise SystemExit("ERROR: backup controls are not grouped in one responsive HigoOS toolbar")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
