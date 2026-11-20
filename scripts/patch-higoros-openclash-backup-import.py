@@ -40,9 +40,11 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
-    's("input",{type:"file",accept:".tar.gz,application/gzip",disabled:t.value,'
+    's("input",{id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:t.value,style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
-    'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["disabled"]),'
+    'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,40,["disabled","onChange"]),'
+    'm(i(p),{variant:"secondary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
+    '{default:r(()=>[d(backupFile.value?.name||"选择备份文件",-1)]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[...e[63]||(e[63]=[d("导入 OpenClash 备份 (.tar.gz)",-1)])]),_:1},8,["disabled"]),'
 )
@@ -51,7 +53,7 @@ if '导入 OpenClash 备份 (.tar.gz)' not in page and page.count(toolbar_anchor
 elif '导入 OpenClash 备份 (.tar.gz)' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
 
-if '/cgi-bin/luci/admin/services/openclash/restore_backup' not in page or 'backupFile.value' not in page:
+if '/cgi-bin/luci/admin/services/openclash/restore_backup' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: HigoOS backup importer was not installed")
 pages[0].write_text(page, encoding="utf-8")
 

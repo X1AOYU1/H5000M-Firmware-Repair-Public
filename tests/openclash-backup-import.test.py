@@ -45,7 +45,9 @@ with tempfile.TemporaryDirectory() as temporary:
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
-        'type:"file",accept:".tar.gz,application/gzip"',
+        'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:t.value,style:{display:"none"}',
+        'document.getElementById("oc-backup-file")?.click()',
+        'backupFile.value?.name||"选择备份文件"',
         '导入 OpenClash 备份 (.tar.gz)',
         '/cgi-bin/luci/admin/services/openclash/restore_backup',
     )
@@ -63,6 +65,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
     if page.count("async function uploadBackup()") != 1 or page.count('导入 OpenClash 备份 (.tar.gz)') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
+    if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
+        raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
