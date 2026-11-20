@@ -25,33 +25,13 @@ else:
 method_anchor = 'async function Je(){'
 method = (
     'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;'
-    't.value=!0;V.value="正在安全导入备份";let input,form,frame,parent,next,ticket,ticketName,token,snapshot,before;try{'
-    'token=Array.from(crypto.getRandomValues(new Uint8Array(24)),value=>value.toString(16).padStart(2,"0")).join("");'
-    'ticketName="openclash_custom_restore_auth_"+token+".yaml";'
-    'snapshot=rows=>JSON.stringify(rows.filter(row=>row.name!==ticketName).map(row=>[row.category,row.name,row.size]));'
-    'before=snapshot(ke.value);ticket=await $.file("custom",ticketName);'
-    'await $.saveFile({...ticket,category:"custom",name:ticketName,content:token,activate:!1});'
-    'ticket=await $.file("custom",ticketName);'
-    'input=document.getElementById("oc-backup-file");if(!input)throw new Error("找不到备份文件控件");'
-    'parent=input.parentNode;next=input.nextSibling;form=document.createElement("form");'
-    'frame=document.createElement("iframe");frame.name="oc-backup-upload-frame";frame.style.display="none";'
-    'form.method="POST";form.enctype="multipart/form-data";'
-    'form.action="/cgi-bin/luci/admin/services/openclash/restore_backup";form.target=frame.name;'
-    'const ticketField=document.createElement("input"),tokenField=document.createElement("input");'
-    'ticketField.type=tokenField.type="hidden";ticketField.name="restore_token_file";ticketField.value=ticketName;'
-    'tokenField.name="restore_token";tokenField.value=token;form.append(ticketField,tokenField);'
-    'input.name="backup_file";input.disabled=!1;form.appendChild(input);'
-    'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);'
-    'frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;'
-    'await new Promise((resolve,reject)=>{'
-    'const timer=setTimeout(()=>reject(new Error("上传等待超时，请检查路由器连接后重试")),300000);'
-    'frame.onload=()=>{clearTimeout(timer);resolve()};input.disabled=!1;form.submit()});'
-    'backupFile.value=null;await N();const after=snapshot(ke.value);'
-    'if(before===after)throw new Error("上传请求已返回，但 HigoOS 未检测到备份文件变化；请确认备份包有效且已登录");'
-    'V.value="备份已导入，OpenClash 保持关闭"'
-    '}catch(error){U(error)}finally{if(input&&parent){if(input.parentNode===form)form.removeChild(input);'
-    'parent.insertBefore(input,next&&next.parentNode===parent?next:null)}'
-    'form?.remove();frame?.remove();if(ticket)try{await $.deleteFile(ticket)}catch{}t.value=!1}}'
+    't.value=!0;V.value="正在安全导入备份";try{'
+    'const form=new FormData();form.append("backup_file",file,file.name);'
+    'const response=await fetch("/cgi-bin/luci/admin/services/openclash/restore_backup",{method:"POST",credentials:"same-origin",body:form});'
+    'const text=await response.text();let result;try{result=JSON.parse(text)}catch{throw new Error("备份接口返回无法识别的响应（HTTP "+response.status+")")} '
+    'if(!response.ok||result.status!=="success")throw new Error(result.message||"备份导入失败（HTTP "+response.status+")");'
+    'backupFile.value=null;await N();V.value=result.message||"备份已导入，OpenClash 保持关闭"'
+    '}catch(error){U(error)}finally{t.value=!1}}'
 )
 if "async function uploadBackup()" not in page and page.count(method_anchor) == 1:
     page = page.replace(method_anchor, method + method_anchor, 1)
@@ -198,24 +178,22 @@ elif "local started, fp, target_path, stream_err, file_size" not in handler:
 auth_anchor = '\t\t\tstarted = true\n\n\t\t\tlocal name = (meta and meta.file) or ""'
 auth_check = (
     '\t\t\tstarted = true\n\n'
-    '\t\t\tlocal token_name = HTTP.formvalue("restore_token_file") or ""\n'
-    '\t\t\tlocal token_value = HTTP.formvalue("restore_token") or ""\n'
-    '\t\t\tlocal token_path\n'
-    '\t\t\tif token_name:match("^openclash_custom_restore_auth_[a-f0-9]+%.yaml$") then\n'
-    '\t\t\t\ttoken_path = "/etc/openclash/custom/" .. token_name\n'
+    '\t\t\tlocal cookie = HTTP.getenv("HTTP_COOKIE") or ""\n'
+    '\t\t\tlocal lan_ip = SYS.exec("uci -q get network.lan.ipaddr 2>/dev/null") or ""\n'
+    '\t\t\tlan_ip = lan_ip:match("([0-9]+%.[0-9]+%.[0-9]+%.[0-9]+)")\n'
+    '\t\t\tlocal auth_status\n'
+    '\t\t\tif #cookie <= 8192 and cookie:find("higo%-mesh%-view%-") and lan_ip then\n'
+    '\t\t\t\tauth_status = SYS.exec("curl --noproxy \'*\' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w \'%{http_code}\' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")\n'
     '\t\t\tend\n'
-    '\t\t\tlocal token_stat = token_path and fs.stat(token_path)\n'
-    '\t\t\tlocal saved_token = token_path and fs.readfile(token_path)\n'
-    '\t\t\tif token_path then fs.unlink(token_path) end\n'
-    '\t\t\tif not token_stat or not saved_token or saved_token ~= token_value or os.time() - (token_stat.mtime or 0) > 300 then\n'
-    '\t\t\t\tstream_err = "HigoOS authorization token is invalid or expired"\n'
+    '\t\t\tif not auth_status or auth_status:match("(%d%d%d)") ~= "200" then\n'
+    '\t\t\t\tstream_err = "HigoOS session is invalid or expired; sign in again"\n'
     '\t\t\t\treturn\n'
     '\t\t\tend\n\n'
     '\t\t\tlocal name = (meta and meta.file) or ""'
 )
 if auth_anchor in handler:
     handler = handler.replace(auth_anchor, auth_check, 1)
-elif 'HigoOS authorization token is invalid or expired' not in handler:
+elif 'HigoOS session is invalid or expired' not in handler:
     raise SystemExit("ERROR: OpenClash upload authorization anchor changed")
 filename_anchor = "\t\t\ttarget_path = backup_dir .. name"
 filename_check = (
