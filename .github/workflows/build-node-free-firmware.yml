@@ -44,16 +44,20 @@ jobs:
           test -n "$FULL_REPAIR_BASE_KEY"
           python3 scripts/decrypt-private-baseline.py input/full-repair-base.aesgcm input/full-repair-base.bin "$FULL_REPAIR_BASE_KEY"
           echo '0ef1a767462ea78271d67388421dda5de3b4097a5a786db47dc75276130492e4  input/full-repair-base.bin' | sha256sum -c -
+      - name: Test login wallpaper patch
+        run: python3 tests/higoros-login-wallpaper-patch.test.py
+      - name: Check wallpaper crop module syntax
+        run: node --input-type=module --check < scripts/higoos-wallpaper-crop.js
+      - name: Test OpenClash node cleanup
+        run: python3 tests/openclash-cleanup.test.py
+      - name: Test OpenClash backup importer
+        run: python3 tests/openclash-backup-import.test.py
+      - name: Test OpenClash card route
+        run: python3 tests/openclash-entry-route.test.py
       - name: Build and verify firmware
         env:
           TZ: Asia/Shanghai
-        run: |
-          python3 tests/higoros-login-wallpaper-patch.test.py
-          node --input-type=module --check < scripts/higoos-wallpaper-crop.js
-          python3 tests/openclash-cleanup.test.py
-          python3 tests/openclash-backup-import.test.py
-          python3 tests/openclash-entry-route.test.py
-          sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
+        run: sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - name: Dynamically click OpenClash app-center entry
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit

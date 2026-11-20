@@ -36,7 +36,10 @@ next(assets.glob("SystemPage-*.js"))
 openclash_page = next(assets.glob("OpenClashPage-*.js"))
 openclash_lua = (root / "usr/lib/lua/luci/openclash.lua").read_text(encoding="utf-8")
 plugin_page = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
-app_router = next(assets.glob("index-*.js")).read_text(encoding="utf-8")
+router_asset = next((path for path in assets.glob("index-*.js") if 'path:"apps/openclash"' in path.read_text(encoding="utf-8")), None)
+if router_asset is None:
+    raise SystemExit("ERROR: HigoOS OpenClash route is not registered")
+app_router = router_asset.read_text(encoding="utf-8")
 package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
@@ -152,7 +155,7 @@ import sys
 
 assets = Path(sys.argv[1])
 plugins = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
-router = next(assets.glob("index-*.js")).read_text(encoding="utf-8")
+router = next(path.read_text(encoding="utf-8") for path in assets.glob("index-*.js") if 'path:"apps/openclash"' in path.read_text(encoding="utf-8"))
 assert 'String(t.featureKey||t.name||"").toLowerCase().replace(/^luci-app-/,"")==="openclash"?{path:"/apps/openclash"}' in plugins
 assert 'path:"apps/openclash"' in router
 print("PASS: final firmware app-center OpenClash route points to the registered HigoOS page")

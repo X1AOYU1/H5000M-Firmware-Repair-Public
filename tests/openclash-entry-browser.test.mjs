@@ -29,8 +29,12 @@ const server = createServer(async (request, response) => {
     const data = url.pathname === "/api/v1/auth/me"
       ? { username: "route-audit", role: "admin", permissions: ["*"] }
       : url.pathname === "/api/v1/plugins/apps"
-        ? [app]
-        : {};
+        ? { apps: [app] }
+        : url.pathname === "/api/v1/notifications"
+          ? []
+          : url.pathname === "/api/v1/notifications/settings"
+            ? { enabled: false }
+            : {};
     response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ code: 0, data }));
     return;
