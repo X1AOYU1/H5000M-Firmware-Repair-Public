@@ -103,6 +103,7 @@ with tempfile.TemporaryDirectory() as temporary:
         '未选择文件',
         '上传',
         'd("备份")',
+        'class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}',
         'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
         'body:file.slice(offset,offset+65536)',
@@ -127,8 +128,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
-        raise SystemExit("ERROR: upload controls were not added to the native file-management row")
+    if page.count('class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+        raise SystemExit("ERROR: native upload row and existing file controls are not separated")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:

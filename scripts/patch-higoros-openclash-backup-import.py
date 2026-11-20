@@ -85,9 +85,10 @@ if "async function uploadBackup()" not in page and page.count(method_anchor) == 
 elif "async function uploadBackup()" not in page:
     raise SystemExit("ERROR: OpenClash importer method anchor changed")
 
-toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,[s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
+toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     toolbar_anchor +
+    's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
     's("label",{for:"oc-backup-file-type",class:"text-sm text-muted"},"上传文件类型："),'
     's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
@@ -100,7 +101,7 @@ toolbar_replacement = (
     's("span",{class:"text-sm text-muted max-w-64 truncate"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[d("上传",-1)]),_:1},8,["disabled"]),'
-    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),'
+    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),]),'
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
