@@ -137,7 +137,8 @@ with tempfile.TemporaryDirectory() as temporary:
         '上传',
         'd("备份")',
         'class:"shrink-0 whitespace-nowrap text-xs text-muted"',
-        'class:"min-w-40 flex-1 truncate text-xs text-muted"',
+        'class:"w-40 shrink-0 truncate text-xs text-muted"',
+        'class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs"',
         '配置文件保存在配置目录（/etc/openclash/config）',
         'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
@@ -163,7 +164,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"shrink-0 whitespace-nowrap text-xs text-muted"') != 1 or page.count('class:"min-w-40 flex-1 truncate text-xs text-muted"') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+    if page.count('class:"shrink-0 whitespace-nowrap text-xs text-muted"') != 1 or page.count('class:"w-40 shrink-0 truncate text-xs text-muted"') != 1 or page.count('class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs"') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
         raise SystemExit("ERROR: OpenClash upload toolbar does not match the native compact layout")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
@@ -197,6 +198,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: .tar and .tar.gz extraction modes are incomplete")
     if r'local gzip_archive = magic == "\31\139"' not in backend or 'local normalized = line:gsub("^%./", "")' not in backend or 'local unsafe_allowed_types = SYS.call' not in backend:
         raise SystemExit("ERROR: restore does not detect actual archive format and filter donor core links safely")
+    if "ipairs(" in backend or 'for index = 1, #allowed do' not in backend or 'for index = 1, #directories do' not in backend or 'for index = 1, #route_files do' not in backend:
+        raise SystemExit("ERROR: restore depends on unavailable ipairs instead of Lua numeric iteration")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
 

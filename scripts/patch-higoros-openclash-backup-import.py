@@ -90,7 +90,7 @@ toolbar_replacement = (
     toolbar_anchor +
     's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
     's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-xs text-muted"},"上传文件类型："),'
-    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-36 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
+    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
     's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar/.tar.gz)")]),'
     's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"},'
@@ -98,7 +98,7 @@ toolbar_replacement = (
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
     'm(i(p),{variant:"primary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
-    's("span",{class:"min-w-40 flex-1 truncate text-xs text-muted"},backupFile.value?.name||"未选择文件"),'
+    's("span",{class:"w-40 shrink-0 truncate text-xs text-muted"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[d("上传",-1)]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),]),'
@@ -158,7 +158,7 @@ replacement = r'''function restore_backup(archive)
 	if tarok and has_profile and not unsafe and not unsafe_allowed_types then
 		local allow = io.open(allowfile, "w")
 		if allow then
-			for _, path in ipairs(allowed) do allow:write(path, "\n") end
+			for index = 1, #allowed do allow:write(allowed[index], "\n") end
 			allow:close()
 			SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " && mkdir -p " .. UTIL.shellquote(stage))
 			if SYS.call("tar -C " .. UTIL.shellquote(stage) .. " " .. tar_extract_options .. quoted .. " -T " .. UTIL.shellquote(allowfile) .. " >/dev/null 2>&1") == 0 then
@@ -183,14 +183,18 @@ replacement = r'''function restore_backup(archive)
 				if selected and selected:match("^[%w_.%-]+%.ya?ml$") then
 					local ok = SYS.call("mkdir -p /etc/openclash/config /etc/openclash/custom /etc/openclash/overwrite /etc/openclash/proxy_provider /etc/openclash/rule_provider") == 0
 					SYS.call("uci set openclash.config.enable=0 && uci commit openclash && /etc/init.d/openclash stop >/dev/null 2>&1")
-					for _, name in ipairs({"config", "custom", "overwrite", "proxy_provider", "rule_provider"}) do
+					local directories = {"config", "custom", "overwrite", "proxy_provider", "rule_provider"}
+					for index = 1, #directories do
+						local name = directories[index]
 						local src = stage .. "/" .. name
 						local dest = "/etc/openclash/" .. name
 						if SYS.call("test -d " .. UTIL.shellquote(src)) == 0 and SYS.call("find " .. UTIL.shellquote(src) .. " -type f -print -quit | grep -q .") == 0 then
 							ok = ok and SYS.call("cp -f " .. UTIL.shellquote(src) .. "/* " .. UTIL.shellquote(dest .. "/")) == 0
 						end
 					end
-					for _, name in ipairs({"china_ip_route.ipset", "china_ip6_route.ipset"}) do
+					local route_files = {"china_ip_route.ipset", "china_ip6_route.ipset"}
+					for index = 1, #route_files do
+						local name = route_files[index]
 						local src = stage .. "/" .. name
 						if SYS.call("test -f " .. UTIL.shellquote(src)) == 0 then
 							ok = ok and SYS.call("cp -f " .. UTIL.shellquote(src) .. " /etc/openclash/") == 0
