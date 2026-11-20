@@ -11,8 +11,6 @@ assets = root / "usr/share/higoros/web/assets"
 report = []
 
 for path in sorted(assets.glob("*.js")):
-    if not path.name.startswith(("index-", "OpenClashPage-")):
-        continue
     text = path.read_text(encoding="utf-8", errors="ignore")
     needles = ("/api/v1/openclash", "openclash/file", "openclash/actions", "multipart/form-data")
     for needle in needles:
