@@ -73,21 +73,23 @@ const server = createServer(async (request, response) => {
 await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
 const address = server.address();
 const baseUrl = `http://127.0.0.1:${address.port}`;
-const browser = await chromium.launch({
-  headless: true,
-  args: ["--no-sandbox"],
-  ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
-    ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
-    : {}),
-});
-const page = await browser.newPage();
+let browser;
+let page;
 const pageErrors = [];
-page.on("pageerror", (error) => pageErrors.push(error.message));
-page.on("console", (message) => {
-  if (message.type() === "error") pageErrors.push(message.text());
-});
 
 try {
+  browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox"],
+    ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+      : {}),
+  });
+  page = await browser.newPage();
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(message.text());
+  });
   await page.goto(`${baseUrl}/plugins`, { waitUntil: "domcontentloaded" });
   const openLink = page.getByRole("link", { name: "打开" });
   await openLink.waitFor({ state: "visible", timeout: 10_000 });
@@ -110,22 +112,22 @@ try {
 } catch (error) {
   const diagnostics = {
     error: error instanceof Error ? error.stack : String(error),
-    url: page.url(),
-    title: await page.title().catch(() => ""),
-    body: await page.locator("body").innerText().catch(() => "").then((text) => text.slice(0, 4000)),
-    links: await page.locator("a").evaluateAll((items) => items.map((item) => ({
+    url: page?.url() ?? null,
+    title: await page?.title().catch(() => "") ?? "",
+    body: page ? await page.locator("body").innerText().catch(() => "").then((text) => text.slice(0, 4000)) : "",
+    links: page ? await page.locator("a").evaluateAll((items) => items.map((item) => ({
       text: item.innerText.trim(),
       href: item.getAttribute("href"),
-    }))).catch(() => []),
+    }))).catch(() => []) : [],
     apiRequests,
     pageErrors,
   };
   const report = JSON.stringify(diagnostics, null, 2) + "\n";
   await (await import("node:fs/promises")).writeFile(reportPath, report, "utf8");
-  process.stderr.write(`::error title=OpenClash click audit::${JSON.stringify(diagnostics)}\n`);
-  process.stderr.write(report);
+  process.stdout.write(`::error title=OpenClash click audit::${JSON.stringify(diagnostics)}\n`);
+  process.stdout.write(report);
   throw error;
 } finally {
-  await browser.close();
+  await browser?.close();
   await new Promise((resolveClose) => server.close(resolveClose));
 }
