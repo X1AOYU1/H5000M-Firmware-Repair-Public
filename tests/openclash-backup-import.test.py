@@ -50,6 +50,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'backupFile.value?.name||"选择备份文件"',
         'form.enctype="multipart/form-data"',
         'form.target=frame.name',
+        'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
         'frame.contentDocument.body.textContent',
         '上传等待超时，请检查路由器连接后重试',
         '导入 OpenClash 备份 (.tar.gz)',
@@ -71,6 +72,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if "fetch(\"/cgi-bin/luci/admin/services/openclash/restore_backup\"" in page:
         raise SystemExit("ERROR: backup upload still uses fetch against the LuCI CGI endpoint")
+    if page.index('frame.onload=()=>{clearTimeout(initTimer);resolve()}') > page.index('document.body.append(frame,form)'):
+        raise SystemExit("ERROR: backup iframe load handler is registered after insertion")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
