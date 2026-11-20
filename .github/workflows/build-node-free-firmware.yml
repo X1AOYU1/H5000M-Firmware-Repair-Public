@@ -59,9 +59,24 @@ jobs:
           TZ: Asia/Shanghai
         run: sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
       - name: Dynamically click OpenClash app-center entry
+        id: openclash_browser_audit
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
         run: node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web output/openclash-entry-browser.txt
+        continue-on-error: true
+      - name: Preserve OpenClash browser audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: H5000M-openclash-browser-audit-${{ github.run_id }}
+          path: output/openclash-entry-browser.txt
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Require successful OpenClash browser audit
+        if: always()
+        run: |
+          test "${{ steps.openclash_browser_audit.outcome }}" = success
+          grep -q '^PASS: HigoOS app-center OpenClash button was clicked' output/openclash-entry-browser.txt
       - uses: actions/upload-artifact@v4
         with:
           name: H5000M-complete-repair-node-free-firmware
