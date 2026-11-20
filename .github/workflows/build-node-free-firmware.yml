@@ -52,10 +52,14 @@ jobs:
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
         run: python3 tests/openclash-backup-import.test.py
+      - name: Test OpenClash manual proxy selection recovery
+        run: python3 tests/openclash-proxy-select.test.py
       - name: Test OpenClash Meta core path repair
         run: python3 tests/openclash-meta-core-link.test.py
       - name: Test OpenClash card route
         run: python3 tests/openclash-entry-route.test.py
+      - name: Test OpenClash one-click latency test
+        run: python3 tests/openclash-bulk-latency.test.py
       - name: Build and verify firmware
         id: firmware_build
         env:
@@ -72,6 +76,8 @@ jobs:
             ${{ runner.temp }}/firmware-build.log
             output/openclash-meta-core-link.txt
             output/openclash-backup-import.txt
+            output/openclash-proxy-select.txt
+            output/openclash-bulk-latency.txt
             output/firmware-verification.txt
           if-no-files-found: warn
           retention-days: 7
@@ -118,6 +124,8 @@ jobs:
             output/metadata-extracted.json
             output/login-wallpaper-fix.txt
             output/openclash-backup-import.txt
+            output/openclash-proxy-select.txt
+            output/openclash-bulk-latency.txt
             output/openclash-entry-route.txt
             ${{ runner.temp }}/higoos-openclash-audit/openclash-entry-browser.txt
             output/openclash-node-cleanup.txt

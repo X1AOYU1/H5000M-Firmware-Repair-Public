@@ -110,25 +110,18 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: the supplied H5000M .tar backup filename is not accepted")
     required_page = (
         'id:"oc-backup-file-type",value:uploadType.value',
-        '"aria-label":"操作类型"',
+        '"aria-label":"上传文件类型"',
         'uploadType=g("config")',
         'value:"config"}',
         'value:"proxy-provider"}',
         'value:"rule-provider"}',
         'value:"clash_meta"}',
         'value:"backup-file"}',
-        'value:"backup-download"}',
-        'value:"create-config"}',
-        'value:"create-overwrite"}',
-        'value:"create-proxy-provider"}',
-        'value:"create-rule-provider"}',
-        'value:"create-custom"}',
-        '上传配置文件 (.yaml)',
-        '上传代理文件',
-        '上传规则集文件',
-        '上传 ARM64 Meta 核心 (.tar.gz)',
-        '导入备份 (.tar/.tar.gz)',
-        '下载 OpenClash 备份',
+        'value:"config"},"配置文件 (.yaml)"',
+        'value:"proxy-provider"},"代理文件"',
+        'value:"rule-provider"},"规则集文件"',
+        'value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"',
+        'value:"backup-file"},"备份文件 (.tar.gz)"',
         'uploadType.value==="backup-file"||uploadType.value==="clash_meta"',
         'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"}',
         'file.name):uploadType.value==="clash_meta"',
@@ -139,11 +132,13 @@ with tempfile.TemporaryDirectory() as temporary:
         'raw.replace(/<!--[\\s\\S]*?-->/g," ")',
         'replace(/<style[^]*?[/]style>/gi," ")',
         'backup_type:"backup"',
-        '操作类型：',
+        '上传文件类型：',
+        'aria-label":"新建文件类型"',
         '选择文件',
         '未选择文件',
-        'd("↑ 上传",-1)',
-        'd("下载备份")',
+        'd("上传",-1)',
+        'd("备份")',
+        'onClick:downloadBackup',
         'fontSize:"14px"',
         'class:"w-44 h-9 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-sm text-muted"',
         'class:"w-52 h-9 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-sm"',
@@ -169,14 +164,16 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete: " + ", ".join(marker for marker in required_page if marker not in page))
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
-    if page.count("async function uploadBackup()") != 1 or page.count('d("↑ 上传",-1)') != 1 or page.count('d("下载备份")') != 1:
+    if page.count("async function uploadBackup()") != 1 or page.count('d("上传",-1)') != 1 or page.count('d("备份")') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if 'await $.saveFile(' in page or 'oc-backup-upload-frame' in page or 'restore_token_file' in page:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('"aria-label":"操作类型"') != 1:
-        raise SystemExit("ERROR: unified operation menu is missing or duplicated")
+    if page.count('"aria-label":"上传文件类型"') != 1:
+        raise SystemExit("ERROR: upload file-type menu is missing or duplicated")
+    if any(marker in page for marker in ('value:"backup-download"', 'value:"create-config"', 'value:"create-overwrite"', 'value:"create-proxy-provider"', 'value:"create-rule-provider"', 'value:"create-custom"')):
+        raise SystemExit("ERROR: upload dropdown contains unrelated backup-download or file-creation choices")
     if page.count('"aria-label":"新建类型"') != 0:
         raise SystemExit("ERROR: duplicate new-file type menu remains")
     if page.count('id:"oc-backup-file-type"') != 1:

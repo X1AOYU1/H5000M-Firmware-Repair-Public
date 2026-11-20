@@ -14,7 +14,9 @@ unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
 
 python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openclash-node-cleanup.txt"
 python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
+python3 scripts/patch-higoros-openclash-proxy-select.py "$OUT/rootfs" | tee "$OUT/openclash-proxy-select.txt"
 python3 scripts/patch-higoros-openclash-entry.py "$OUT/rootfs" | tee "$OUT/openclash-entry-route.txt"
+python3 scripts/patch-higoros-openclash-bulk-latency.py "$OUT/rootfs" | tee "$OUT/openclash-bulk-latency.txt"
 python3 scripts/patch-openclash-meta-core-link.py "$OUT/rootfs" | tee "$OUT/openclash-meta-core-link.txt"
 
 # Apply the current login-page fix and revise every SPA asset URL afterward.
@@ -55,6 +57,8 @@ checks = {
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and 'y("iframe"' not in openclash_page.read_text(encoding="utf-8"),
     "OpenClash app-center button uses its HigoOS route": '[t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v||"").toLowerCase().includes("openclash"))?{path:"/apps/openclash"}' in plugin_page and 'path:"apps/openclash"' in app_router,
+    "OpenClash runtime one-click latency test": all(value in openclash_page.read_text(encoding="utf-8") for value in ("一键测速", "h5000mRunAllLatency", "Math.min(5,h5000mNodes.length)", "h5000mBulkProgress", '"test-latency",name', 'de.value[String(result.name)]')) and openclash_page.read_text(encoding="utf-8").count("h5000mRunAllLatency") == 2,
+    "OpenClash manual selection readback recovery": all(value in openclash_page.read_text(encoding="utf-8") for value in ("h5000mConfirmProxySelection", 'includes("节点选择回读不一致")', 'selected?.now===name')) and openclash_page.read_text(encoding="utf-8").count("h5000mConfirmProxySelection") == 2,
     "Meta core canonical executable link repaired": all(value in openclash_subscribe for value in ('ensure_meta_core_compat_link()', 'ensure_meta_core_compat_link || {', '/etc/openclash/core/clash_meta', '/tmp/etc/openclash/core/clash_meta')) and 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in openclash_core_update,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
@@ -64,15 +68,18 @@ checks = {
 upload_ui = (
     'id:"oc-backup-file-type"' in openclash_page.read_text(encoding="utf-8")
     and all(value in openclash_page.read_text(encoding="utf-8") for value in (
-        '"aria-label":"操作类型"', 'value:"backup-download"',
-        'value:"create-config"', 'value:"create-overwrite"',
-        'value:"create-proxy-provider"', 'value:"create-rule-provider"',
-        'value:"create-custom"', '选择文件', '未选择文件', '↑ 上传', '下载备份',
+        '"aria-label":"上传文件类型"',
+        'value:"config"},"配置文件 (.yaml)"',
+        'value:"proxy-provider"},"代理文件"',
+        'value:"rule-provider"},"规则集文件"',
+        'value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"',
+        'value:"backup-file"},"备份文件 (.tar.gz)"', '选择文件', '未选择文件', '上传', '备份',
         'fontSize:"14px"', 'text-sm',
         'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
         'body:file.slice(offset,offset+65536)',
     ))
-    and '"aria-label":"新建类型"' not in openclash_page.read_text(encoding="utf-8")
+    and '"aria-label":"新建文件类型"' in openclash_page.read_text(encoding="utf-8")
+    and all(value not in openclash_page.read_text(encoding="utf-8") for value in ('value:"backup-download"', 'value:"create-config"', 'value:"create-overwrite"', 'value:"create-proxy-provider"', 'value:"create-rule-provider"', 'value:"create-custom"'))
     and 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash_page.read_text(encoding="utf-8")
     and '配置文件保存在配置目录（/etc/openclash/config）' not in openclash_page.read_text(encoding="utf-8")
 )
@@ -208,8 +215,12 @@ configs = Path(sys.argv[2])
 assert not (configs / "dy.yaml").exists() and not (configs / "127.0.0.1.yaml").exists()
 openclash = next(Path(sys.argv[3]).glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
 assert len(openclash) > 1000 and 'y("iframe"' not in openclash
-assert all(value in openclash for value in ('操作类型：', '上传配置文件 (.yaml)', '上传代理文件', '上传规则集文件', '上传 ARM64 Meta 核心 (.tar.gz)', '导入备份 (.tar/.tar.gz)', '下载 OpenClash 备份', '新建主配置', '新建覆写文件', '新建代理提供者', '新建规则提供者', '新建自定义文件', '选择文件', '未选择文件', '↑ 上传', '下载备份', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
-assert '"aria-label":"操作类型"' in openclash and '"aria-label":"新建类型"' not in openclash
+assert all(value in openclash for value in ("一键测速", "h5000mRunAllLatency", "Math.min(5,h5000mNodes.length)", "h5000mBulkProgress", '"test-latency",name', 'de.value[String(result.name)]'))
+assert all(value in openclash for value in ("h5000mConfirmProxySelection", 'includes("节点选择回读不一致")', 'selected?.now===name'))
+assert all(value in openclash for value in ('操作类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar.gz)', '选择文件', '未选择文件', '上传', '备份', 'onClick:downloadBackup', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
+assert '"aria-label":"上传文件类型"' in openclash and '"aria-label":"操作类型"' not in openclash
+assert '上传文件类型：' in openclash and 'aria-label":"新建文件类型"' in openclash
+assert all(value not in openclash for value in ('value:"backup-download"', 'value:"create-config"', 'value:"create-overwrite"', 'value:"create-proxy-provider"', 'value:"create-rule-provider"', 'value:"create-custom"'))
 assert 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash
 assert '配置文件保存在配置目录（/etc/openclash/config）' not in openclash
 subscribe = (Path(sys.argv[4]) / "openclash.sh").read_text(encoding="utf-8")
