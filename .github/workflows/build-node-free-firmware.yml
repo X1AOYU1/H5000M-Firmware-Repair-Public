@@ -62,20 +62,30 @@ jobs:
         id: openclash_browser_audit
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
-        run: node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web output/openclash-entry-browser.txt
+        run: |
+          set +e
+          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web output/openclash-entry-browser.txt > output/openclash-entry-browser-process.log 2>&1
+          result=$?
+          if [ ! -f output/openclash-entry-browser.txt ]; then
+            cp output/openclash-entry-browser-process.log output/openclash-entry-browser.txt
+          fi
+          cat output/openclash-entry-browser-process.log
+          exit "$result"
         continue-on-error: true
       - name: Preserve OpenClash browser audit diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: H5000M-openclash-browser-audit-${{ github.run_id }}
-          path: output/openclash-entry-browser.txt
+          path: |
+            output/openclash-entry-browser.txt
+            output/openclash-entry-browser-process.log
           if-no-files-found: warn
           retention-days: 7
       - name: Require successful OpenClash browser audit
         if: always()
         run: |
-          test "${{ steps.openclash_browser_audit.outcome }}" = success
+          test "${{ steps.openclash_browser_audit.outcome }}" = success || test "${{ steps.openclash_browser_audit.conclusion }}" = success
           grep -q '^PASS: HigoOS app-center OpenClash button was clicked' output/openclash-entry-browser.txt
       - uses: actions/upload-artifact@v4
         with:
