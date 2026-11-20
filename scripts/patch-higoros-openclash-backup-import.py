@@ -25,12 +25,22 @@ else:
 method_anchor = 'async function Je(){'
 method = (
     'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;'
-    't.value=!0;V.value="正在安全导入备份";try{const body=new FormData;body.append("backup_file",file);'
-    'const response=await fetch("/cgi-bin/luci/admin/services/openclash/restore_backup",'
-    '{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"XMLHttpRequest"},body});'
-    'const result=await response.json();if(!response.ok||result.status!=="success")'
-    'throw new Error(result.message||"备份导入失败");backupFile.value=null;V.value="备份已导入，OpenClash 保持关闭";'
-    'await N()}catch(error){U(error)}finally{t.value=!1}}'
+    't.value=!0;V.value="正在安全导入备份";let input,form,frame,parent,next;try{'
+    'input=document.getElementById("oc-backup-file");if(!input)throw new Error("找不到备份文件控件");'
+    'parent=input.parentNode;next=input.nextSibling;form=document.createElement("form");'
+    'frame=document.createElement("iframe");frame.name="oc-backup-upload-frame";frame.style.display="none";'
+    'form.method="POST";form.enctype="multipart/form-data";'
+    'form.action="/cgi-bin/luci/admin/services/openclash/restore_backup";form.target=frame.name;'
+    'input.name="backup_file";input.disabled=!1;form.appendChild(input);document.body.append(frame,form);'
+    'await new Promise(resolve=>{frame.onload=resolve});const result=await new Promise((resolve,reject)=>{'
+    'const timer=setTimeout(()=>reject(new Error("上传等待超时，请检查路由器连接后重试")),300000);'
+    'frame.onload=()=>{clearTimeout(timer);try{const text=frame.contentDocument.body.textContent||"";'
+    'const data=JSON.parse(text);if(data.status!=="success")reject(new Error(data.message||"备份导入失败"));'
+    'else resolve(data)}catch(error){reject(error)}};form.submit()});'
+    'backupFile.value=null;V.value=result.message||"备份已导入，OpenClash 保持关闭";await N()'
+    '}catch(error){U(error)}finally{if(input&&parent){if(input.parentNode===form)form.removeChild(input);'
+    'parent.insertBefore(input,next&&next.parentNode===parent?next:null)}'
+    'form?.remove();frame?.remove();t.value=!1}}'
 )
 if "async function uploadBackup()" not in page and page.count(method_anchor) == 1:
     page = page.replace(method_anchor, method + method_anchor, 1)

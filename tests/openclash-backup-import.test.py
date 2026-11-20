@@ -48,6 +48,10 @@ with tempfile.TemporaryDirectory() as temporary:
         'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:t.value,style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"选择备份文件"',
+        'form.enctype="multipart/form-data"',
+        'form.target=frame.name',
+        'frame.contentDocument.body.textContent',
+        '上传等待超时，请检查路由器连接后重试',
         '导入 OpenClash 备份 (.tar.gz)',
         '/cgi-bin/luci/admin/services/openclash/restore_backup',
     )
@@ -65,6 +69,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
     if page.count("async function uploadBackup()") != 1 or page.count('导入 OpenClash 备份 (.tar.gz)') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
+    if "fetch(\"/cgi-bin/luci/admin/services/openclash/restore_backup\"" in page:
+        raise SystemExit("ERROR: backup upload still uses fetch against the LuCI CGI endpoint")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
