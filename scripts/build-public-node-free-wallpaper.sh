@@ -185,7 +185,7 @@ assert '[t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v|
 assert 'path:"apps/openclash"' in router
 print("PASS: final firmware app-center OpenClash route points to the registered HigoOS page")
 PY
-python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" "$OUT/final-root/usr/share/higoros/web/assets" <<'PY'
+python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" "$OUT/final-root/usr/share/higoros/web/assets" "$OUT/final-root/usr/share/openclash" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -199,7 +199,13 @@ configs = Path(sys.argv[2])
 assert not (configs / "dy.yaml").exists() and not (configs / "127.0.0.1.yaml").exists()
 openclash = next(Path(sys.argv[3]).glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
 assert len(openclash) > 1000 and 'y("iframe"' not in openclash
-assert all(value in openclash for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '上传', '备份', '配置文件保存在配置目录（/etc/openclash/config）'))
+assert all(value in openclash for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '↑ 上传', '↓ 备份', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
+assert 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash
+assert '配置文件保存在配置目录（/etc/openclash/config）' not in openclash
+subscribe = (Path(sys.argv[4]) / "openclash.sh").read_text(encoding="utf-8")
+core_update = (Path(sys.argv[4]) / "openclash_core.sh").read_text(encoding="utf-8")
+assert 'ensure_meta_core_compat_link || {' in subscribe
+assert 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in core_update
 PY
 sha256sum "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
 stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
