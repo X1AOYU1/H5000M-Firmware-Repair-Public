@@ -88,20 +88,20 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     toolbar_anchor +
-    's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
-    's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-xs text-muted"},"上传文件类型："),'
-    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
+    's("div",{class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}},['
+    's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}},"上传文件类型："),'
+    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
     's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar/.tar.gz)")]),'
     's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
-    'm(i(p),{variant:"primary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
+    'm(i(p),{variant:"primary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0,backgroundColor:"#477fe0",borderColor:"#477fe0",color:"#fff"},disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
-    's("span",{class:"w-40 shrink-0 truncate text-xs text-muted"},backupFile.value?.name||"未选择文件"),'
-    'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
-    '{default:r(()=>[d("上传",-1)]),_:1},8,["disabled"]),'
-    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),]),'
+    's("span",{class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}},backupFile.value?.name||"未选择文件"),'
+    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value||!backupFile.value,onClick:uploadBackup},'
+    '{default:r(()=>[d("↑ 上传",-1)]),_:1},8,["disabled"]),'
+    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("↓ 备份")]),_:1},8,["disabled"]),]),'
     's("p",{class:"mt-1 w-full text-center text-xs text-muted"},"配置文件保存在配置目录（/etc/openclash/config）"),'
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:

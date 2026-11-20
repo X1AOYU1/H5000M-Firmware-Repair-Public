@@ -134,11 +134,12 @@ with tempfile.TemporaryDirectory() as temporary:
         '上传文件类型：',
         '选择文件',
         '未选择文件',
-        '上传',
-        'd("备份")',
-        'class:"shrink-0 whitespace-nowrap text-xs text-muted"',
-        'class:"w-40 shrink-0 truncate text-xs text-muted"',
-        'class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs"',
+        'd("↑ 上传",-1)',
+        'd("↓ 备份")',
+        'class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}',
+        'class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}',
+        'class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"',
+        'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}',
         '配置文件保存在配置目录（/etc/openclash/config）',
         'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
@@ -158,13 +159,13 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete: " + ", ".join(marker for marker in required_page if marker not in page))
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
-    if page.count("async function uploadBackup()") != 1 or page.count('d("上传",-1)') != 1 or page.count('d("备份")') != 1:
+    if page.count("async function uploadBackup()") != 1 or page.count('d("↑ 上传",-1)') != 1 or page.count('d("↓ 备份")') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if 'await $.saveFile(' in page or 'oc-backup-upload-frame' in page or 'restore_token_file' in page:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"shrink-0 whitespace-nowrap text-xs text-muted"') != 1 or page.count('class:"w-40 shrink-0 truncate text-xs text-muted"') != 1 or page.count('class:"w-28 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs"') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+    if page.count('class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}') != 1 or page.count('class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}') != 1 or page.count('class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"') != 1 or page.count('class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}') != 1:
         raise SystemExit("ERROR: OpenClash upload toolbar does not match the native compact layout")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
