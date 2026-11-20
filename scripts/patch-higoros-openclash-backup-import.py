@@ -14,8 +14,8 @@ if len(pages) != 1 or not lua.is_file() or not controller.is_file():
 
 page = pages[0].read_text(encoding="utf-8")
 state_anchor = 've=g("config"),X=g(""),he=W(()=>'
-state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),backupType=g("backup"),he=W', 1)
-if 'backupFile=g(null),backupType=g("backup"),he=W(()=>' in page:
+state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),backupFormat=g("tar.gz"),he=W', 1)
+if 'backupFile=g(null),backupFormat=g("tar.gz"),he=W(()=>' in page:
     pass
 elif page.count(state_anchor) == 1:
     page = page.replace(state_anchor, state_replacement, 1)
@@ -27,13 +27,13 @@ method = (
     'async function backupRequest(params,options={}){const path=params.operation==="download"?"backup":"upload";const response=await fetch("/cgi-bin/luci/higoros/openclash/"+path+"?"+new URLSearchParams(params),{credentials:"same-origin",...options});'
     'if(!response.ok){const message=await response.text();throw new Error(message||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
     'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
-    'const response=await backupRequest({operation:"download",backup_type:backupType.value});'
+    'const response=await backupRequest({operation:"download",backup_type:"backup"});'
     'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
     'const match=(response.headers.get("Content-Disposition")||"").match(/filename="?([^";]+)"?/i);'
     'const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=match?match[1]:"OpenClash-backup.tar.gz";'
     'document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);V.value="备份已生成并下载"'
     '}catch(error){U(error)}finally{t.value=!1}}'
-    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value,id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
+    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;if(backupFormat.value==="tar"?!file.name.toLowerCase().endsWith(".tar"):!file.name.toLowerCase().endsWith(".tar.gz")){U(new Error("所选文件与上传类型不一致"));return}const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
     't.value=!0;V.value="正在安全导入备份";let started=!1;try{'
     'await backupRequest({operation:"start",upload_id:id,filename:file.name},{method:"POST"});started=!0;'
     'for(let offset=0;offset<file.size;offset+=1048576){V.value="正在上传备份 "+Math.min(100,Math.round((offset+1048576)/file.size*100))+"%";'
@@ -51,27 +51,27 @@ toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
     's("div",{class:"flex flex-wrap items-center gap-2"},['
-    's("input",{id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"},'
+    's("span",{class:"text-sm text-muted"},"上传文件类型"),'
+    's("select",{value:backupFormat.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{backupFormat.value=e.target.value;backupFile.value=null}},['
+    's("option",{value:"tar.gz"},"备份文件 (.tar.gz)"),s("option",{value:"tar"},"备份文件 (.tar)")]),'
+    's("input",{id:"oc-backup-file",type:"file",accept:backupFormat.value==="tar"?".tar,application/x-tar":".tar.gz,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
-    'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["onChange"]),'
+    'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
-    '{default:r(()=>[d(backupFile.value?.name||"选择备份文件",-1)]),_:1},8,["disabled"]),'
+    '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
+    's("span",{class:"text-sm text-muted max-w-64 truncate"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
-    '{default:r(()=>[...e[63]||(e[63]=[d("导入 OpenClash 备份 (.tar / .tar.gz)",-1)])]),_:1},8,["disabled"]),'
-    's("select",{value:backupType.value,disabled:t.value,"aria-label":"备份范围",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>backupType.value=e.target.value},['
-    's("option",{value:"backup"},"完整备份"),s("option",{value:"backup_ex_core"},"备份，不含内核"),'
-    's("option",{value:"backup_only_config"},"仅配置"),s("option",{value:"backup_only_rule"},"仅规则提供者"),'
-    's("option",{value:"backup_only_proxy"},"仅代理提供者"),s("option",{value:"backup_only_core"},"仅内核")]),'
-    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("生成备份")])]),_:1},8,["disabled"]),'
+    '{default:r(()=>[...e[63]||(e[63]=[d("上传",-1)])]),_:1},8,["disabled"]),'
+    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("备份")])]),_:1},8,["disabled"]),'
     ']),'
 )
-if '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page and page.count(toolbar_anchor) == 1:
+if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
-elif '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page:
+elif 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
 
-if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page:
-    raise SystemExit("ERROR: HigoOS backup importer was not installed")
+if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '上传文件类型' not in page or '未选择文件' not in page:
+    raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '上传文件类型', '未选择文件') if marker not in page))
 pages[0].write_text(page, encoding="utf-8")
 
 source = lua.read_text(encoding="utf-8")

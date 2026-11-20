@@ -67,26 +67,23 @@ with tempfile.TemporaryDirectory() as temporary:
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
-        'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",style:{display:"none"}',
+        'id:"oc-backup-file",type:"file",accept:backupFormat.value==="tar"?".tar,application/x-tar":".tar.gz,application/gzip",style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
-        'backupFile.value?.name||"选择备份文件"',
+        'backupFile.value?.name||"未选择文件"',
         'async function downloadBackup()',
-        'backupType=g("backup")',
-        'backup_type:backupType.value',
-        '导入 OpenClash 备份 (.tar / .tar.gz)',
-        '备份范围',
-        '生成备份',
+        'backupFormat=g("tar.gz")',
+        'backup_type:"backup"',
+        '上传文件类型',
+        '备份文件 (.tar.gz)',
+        '备份文件 (.tar)',
+        '选择文件',
+        '未选择文件',
+        '上传',
+        'd("备份")',
         'class:"flex flex-wrap items-center gap-2"',
-        'value:"backup"}',
-        'value:"backup_ex_core"}',
-        'value:"backup_only_config"}',
-        'value:"backup_only_rule"}',
-        'value:"backup_only_proxy"}',
-        'value:"backup_only_core"}',
         'application/octet-stream',
         'body:file.slice(offset,offset+1048576)',
         'params.operation==="download"?"backup":"upload"',
-        '导入 OpenClash 备份 (.tar / .tar.gz)',
         '/cgi-bin/luci/higoros/openclash/',
     )
     required_backend = (
@@ -101,11 +98,11 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete")
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
-    if page.count("async function uploadBackup()") != 1 or page.count('导入 OpenClash 备份 (.tar / .tar.gz)') != 1:
+    if page.count("async function uploadBackup()") != 1 or page.count('d("上传",-1)') != 1 or page.count('d("备份")') != 1:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if 'await $.saveFile(' in page or 'oc-backup-upload-frame' in page or 'restore_token_file' in page:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
-    if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
+    if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
     if page.count('class:"flex flex-wrap items-center gap-2"') != 1:
         raise SystemExit("ERROR: backup controls are not grouped in one responsive HigoOS toolbar")
