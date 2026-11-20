@@ -73,12 +73,13 @@ upload_ui = (
         'value:"proxy-provider"},"代理文件"',
         'value:"rule-provider"},"规则集文件"',
         'value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"',
-        'value:"backup-file"},"备份文件 (.tar.gz)"', '选择文件', '未选择文件', '上传', '备份',
+        'value:"backup-file"},"备份文件 (.tar.gz)"', 'value:"create-file"},"新建文件"', '选择文件', '未选择文件', '上传', '备份',
         'fontSize:"14px"', 'text-sm',
         'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
         'body:file.slice(offset,offset+65536)',
     ))
     and '"aria-label":"新建文件类型"' in openclash_page.read_text(encoding="utf-8")
+    and 'style:{display:uploadType.value==="create-file"?"":"none"}' in openclash_page.read_text(encoding="utf-8")
     and all(value not in openclash_page.read_text(encoding="utf-8") for value in ('value:"backup-download"', 'value:"create-config"', 'value:"create-overwrite"', 'value:"create-proxy-provider"', 'value:"create-rule-provider"', 'value:"create-custom"'))
     and 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash_page.read_text(encoding="utf-8")
     and '配置文件保存在配置目录（/etc/openclash/config）' not in openclash_page.read_text(encoding="utf-8")
@@ -219,7 +220,8 @@ assert all(value in openclash for value in ("一键测速", "h5000mRunAllLatency
 assert all(value in openclash for value in ("h5000mConfirmProxySelection", 'includes("节点选择回读不一致")', 'selected?.now===name'))
 assert all(value in openclash for value in ('操作类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar.gz)', '选择文件', '未选择文件', '上传', '备份', 'onClick:downloadBackup', 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'))
 assert '"aria-label":"上传文件类型"' in openclash and '"aria-label":"操作类型"' not in openclash
-assert '上传文件类型：' in openclash and 'aria-label":"新建文件类型"' in openclash
+assert '上传文件类型：' in openclash and 'aria-label":"新建文件类型"' in openclash and 'style:{display:uploadType.value==="create-file"?"":"none"}' in openclash
+assert 'value:"create-file"},"新建文件"' in openclash
 assert all(value not in openclash for value in ('value:"backup-download"', 'value:"create-config"', 'value:"create-overwrite"', 'value:"create-proxy-provider"', 'value:"create-rule-provider"', 'value:"create-custom"'))
 assert 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash
 assert '配置文件保存在配置目录（/etc/openclash/config）' not in openclash

@@ -122,6 +122,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'value:"rule-provider"},"规则集文件"',
         'value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"',
         'value:"backup-file"},"备份文件 (.tar.gz)"',
+        'value:"create-file"},"新建文件"',
         'uploadType.value==="backup-file"||uploadType.value==="clash_meta"',
         'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"}',
         'file.name):uploadType.value==="clash_meta"',
@@ -139,6 +140,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'd("上传",-1)',
         'd("备份")',
         'onClick:downloadBackup',
+        'style:{display:uploadType.value==="create-file"?"":"none"}',
         'fontSize:"14px"',
         'class:"w-44 h-9 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-sm text-muted"',
         'class:"w-52 h-9 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-sm"',
@@ -176,6 +178,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: upload dropdown contains unrelated backup-download or file-creation choices")
     if page.count('"aria-label":"新建类型"') != 0:
         raise SystemExit("ERROR: duplicate new-file type menu remains")
+    if page.count('"aria-label":"新建文件类型"') != 1 or page.count('placeholder:"文件名.yaml"') != 1:
+        raise SystemExit("ERROR: contextual create-file controls are missing or duplicated")
     if page.count('id:"oc-backup-file-type"') != 1:
         raise SystemExit("ERROR: unified operation menu control is duplicated")
     if page.count('Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}') != 1 or '配置文件保存在配置目录（/etc/openclash/config）' in page:
