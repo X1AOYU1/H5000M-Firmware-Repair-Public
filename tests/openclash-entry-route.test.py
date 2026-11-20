@@ -23,8 +23,8 @@ with tempfile.TemporaryDirectory() as temporary:
     subprocess.run([sys.executable, str(patcher), str(root)], check=True)
     source = asset.read_text(encoding="utf-8")
     expression = (
-        'String(t.featureKey||t.name||"").toLowerCase()'
-        '.replace(/^luci-app-/,"")==="openclash"?'
+        '[t.featureKey,t.name,t.displayName,t.entryRoute?.path]'
+        '.some(v=>String(v||"").toLowerCase().includes("openclash"))?'
         '{path:"/apps/openclash"}:t.entryRoute||'
         '{path:"/other",query:{tab:t.featureKey}}'
     )
@@ -37,6 +37,8 @@ with tempfile.TemporaryDirectory() as temporary:
       const cases = [
         [{{featureKey:'openclash'}}, '/apps/openclash'],
         [{{featureKey:'luci-app-openclash',entryRoute:{{path:'/wrong'}}}}, '/apps/openclash'],
+        [{{featureKey:'feature-42',name:'package-42',displayName:'OpenClash',entryRoute:{{path:'/wrong'}}}}, '/apps/openclash'],
+        [{{featureKey:'feature-42',name:'package-42',entryRoute:{{path:'/apps/openclash'}}}}, '/apps/openclash'],
         [{{featureKey:'passwall'}}, '/other']
       ];
       for (const [app, expected] of cases) {{

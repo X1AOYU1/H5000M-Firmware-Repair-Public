@@ -13,7 +13,7 @@ def patch(root: Path) -> str:
     page = pages[0]
     source = page.read_text(encoding="utf-8")
     fallback = 'to:t.entryRoute||{path:"/other",query:{tab:t.featureKey}}'
-    mapping = 'to:(String(t.featureKey||t.name||"").toLowerCase().replace(/^luci-app-/,"")==="openclash"?{path:"/apps/openclash"}:t.entryRoute||{path:"/other",query:{tab:t.featureKey}})'
+    mapping = 'to:([t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v||"").toLowerCase().includes("openclash"))?{path:"/apps/openclash"}:t.entryRoute||{path:"/other",query:{tab:t.featureKey}})'
 
     if mapping in source:
         return "PASS: OpenClash app card already maps to /apps/openclash"

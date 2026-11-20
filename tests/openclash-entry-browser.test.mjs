@@ -14,8 +14,8 @@ const require = createRequire(join(moduleRoot, "__audit__.cjs"));
 const { chromium } = require("playwright");
 const apiRequests = [];
 const app = {
-  name: "luci-app-openclash",
-  featureKey: "luci-app-openclash",
+  name: "package-42",
+  featureKey: "feature-42",
   displayName: "OpenClash",
   version: "0.48.002-r4",
   kind: "native",
@@ -73,7 +73,13 @@ const server = createServer(async (request, response) => {
 await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
 const address = server.address();
 const baseUrl = `http://127.0.0.1:${address.port}`;
-const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+const browser = await chromium.launch({
+  headless: true,
+  args: ["--no-sandbox"],
+  ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+    ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+    : {}),
+});
 const page = await browser.newPage();
 const pageErrors = [];
 page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -101,6 +107,23 @@ try {
   ].join("\n") + "\n";
   await (await import("node:fs/promises")).writeFile(reportPath, report, "utf8");
   process.stdout.write(report);
+} catch (error) {
+  const diagnostics = {
+    error: error instanceof Error ? error.stack : String(error),
+    url: page.url(),
+    title: await page.title().catch(() => ""),
+    body: await page.locator("body").innerText().catch(() => "").then((text) => text.slice(0, 4000)),
+    links: await page.locator("a").evaluateAll((items) => items.map((item) => ({
+      text: item.innerText.trim(),
+      href: item.getAttribute("href"),
+    }))).catch(() => []),
+    apiRequests,
+    pageErrors,
+  };
+  const report = JSON.stringify(diagnostics, null, 2) + "\n";
+  await (await import("node:fs/promises")).writeFile(reportPath, report, "utf8");
+  process.stderr.write(report);
+  throw error;
 } finally {
   await browser.close();
   await new Promise((resolveClose) => server.close(resolveClose));
