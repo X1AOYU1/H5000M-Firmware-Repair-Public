@@ -63,7 +63,7 @@ else:
 method_anchor = 'async function Je(){'
 method = (
     'async function backupRequest(params,options={}){const path=params.operation==="download"?"backup":"upload";const response=await fetch("/cgi-bin/luci/higoros/openclash/"+path+"?"+new URLSearchParams(params),{credentials:"same-origin",...options});'
-    'if(!response.ok){const raw=await response.text();if(/POST data exceeds maximum allowed length/i.test(raw))throw new Error("路由器拒绝了上传数据块（HTTP "+response.status+"），请重新刷入新版固件");const clean=raw.replace(/<!--[\\s\\S]*?-->/g," ").replace(/<style[\\s\\S]*?<\\/style>/gi," ").replace(/<script[\\s\\S]*?<\\/script>/gi," ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,180);throw new Error(clean||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
+    'if(!response.ok){const raw=await response.text();if(/POST data exceeds maximum allowed length/i.test(raw))throw new Error("路由器拒绝了上传数据块（HTTP "+response.status+"），请重新刷入新版固件");const clean=raw.replace(/<!--[\\s\\S]*?-->/g," ").replace(/<style[^]*?[/]style>/gi," ").replace(/<script[^]*?[/]script>/gi," ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,180);throw new Error(clean||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
     'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
     'const response=await backupRequest({operation:"download",backup_type:"backup"});'
     'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
@@ -85,10 +85,9 @@ if "async function uploadBackup()" not in page and page.count(method_anchor) == 
 elif "async function uploadBackup()" not in page:
     raise SystemExit("ERROR: OpenClash importer method anchor changed")
 
-toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
+toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,[s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
 toolbar_replacement = (
-    'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
-    's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
+    toolbar_anchor +
     's("label",{for:"oc-backup-file-type",class:"text-sm text-muted"},"上传文件类型："),'
     's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
@@ -100,31 +99,13 @@ toolbar_replacement = (
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
     's("span",{class:"text-sm text-muted max-w-64 truncate"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
-    '{default:r(()=>[...e[63]||(e[63]=[d("上传",-1)])]),_:1},8,["disabled"]),'
-    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[...e[64]||(e[64]=[d("备份")])]),_:1},8,["disabled"]),'
-    ']),s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
+    '{default:r(()=>[d("上传",-1)]),_:1},8,["disabled"]),'
+    'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),'
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
 elif 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
-
-second_row = 's("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},['
-if second_row in page:
-    row_open = page.find(second_row) + len(second_row) - 1
-    try:
-        row_close = matching_delimiter(page, row_open)
-    except ValueError as error:
-        raise SystemExit(f"ERROR: unable to separate upload and file-management controls: {error}")
-    suffix = page[row_close + 1:]
-    if suffix.startswith(")])]"):
-        pass
-    elif suffix.startswith(")]"):
-        # The first ')' can close the new row; restore the enclosing Ql array
-        # and div before the page-level array and section are closed.
-        page = page[:row_close + 2] + "])" + page[row_close + 2:]
-    elif not suffix.startswith(")"):
-        page = page[:row_close + 1] + ")" + page[row_close + 1:]
 
 if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '上传文件类型' not in page or '未选择文件' not in page:
     raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '上传文件类型', '未选择文件') if marker not in page))

@@ -11,7 +11,7 @@ repo = Path(__file__).resolve().parents[1]
 page_source = (
     'const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
     'async function Je(){return null}return()=>f.value==="files"?(o(),'
-    'y("section",Hl,[s("div",Ql,[s("button",null)])])):null}});'
+    'y("section",Hl,[s("div",Ql,[s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[s("button",null)])])])):null}});'
 )
 lua_source = (
     'function restore_backup(archive)\n\treturn false\nend\n'
@@ -64,7 +64,12 @@ with tempfile.TemporaryDirectory() as temporary:
     page = next(assets.glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
     node = shutil.which("node")
     if node:
-        subprocess.run([node, "--check", str(next(assets.glob("OpenClashPage-*.js")))], check=True)
+        checked_page = next(assets.glob("OpenClashPage-*.js"))
+        check = subprocess.run([node, "--check", str(checked_page)], text=True, encoding="utf-8", capture_output=True)
+        if check.returncode:
+            generated = checked_page.read_text(encoding="utf-8")
+            (repo / "OpenClashPage-fixture.debug.js").write_text(generated, encoding="utf-8")
+            raise SystemExit(check.stderr or check.stdout or "Node.js rejected the patched OpenClash page")
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     user_backup_name = "Backup-OpenClash-Hiveton H5000M-aarch64-2026-11-20-14-47-56.tar"
@@ -91,14 +96,13 @@ with tempfile.TemporaryDirectory() as temporary:
         'backupFile.value?.name||"未选择文件"',
         'async function downloadBackup()',
         'raw.replace(/<!--[\\s\\S]*?-->/g," ")',
-        'replace(/<style[\\s\\S]*?<\\/style>/gi," ")',
+        'replace(/<style[^]*?[/]style>/gi," ")',
         'backup_type:"backup"',
         '上传文件类型：',
         '选择文件',
         '未选择文件',
         '上传',
         'd("备份")',
-        'class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}',
         'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
         'body:file.slice(offset,offset+65536)',
@@ -114,7 +118,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'china_ip6_route.ipset',
     )
     if any(marker not in page for marker in required_page):
-        raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete")
+        raise SystemExit("ERROR: HigoOS OpenClash backup upload UI is incomplete: " + ", ".join(marker for marker in required_page if marker not in page))
     if any(marker not in backend for marker in required_backend):
         raise SystemExit("ERROR: filtered H5000M backup restore is incomplete")
     if page.count("async function uploadBackup()") != 1 or page.count('d("上传",-1)') != 1 or page.count('d("备份")') != 1:
@@ -123,8 +127,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
-        raise SystemExit("ERROR: native upload row and existing file controls are not separated")
+    if page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+        raise SystemExit("ERROR: upload controls were not added to the native file-management row")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
