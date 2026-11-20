@@ -88,7 +88,6 @@ elif "async function uploadBackup()" not in page:
 toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     toolbar_anchor +
-    's("div",{class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}},['
     's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}},"上传文件类型："),'
     's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
@@ -101,8 +100,7 @@ toolbar_replacement = (
     's("span",{class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[d("↑ 上传",-1)]),_:1},8,["disabled"]),'
-    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("↓ 备份")]),_:1},8,["disabled"]),]),'
-    's("p",{class:"mt-1 w-full text-center text-xs text-muted"},"配置文件保存在配置目录（/etc/openclash/config）"),'
+    'm(i(p),{variant:"secondary",class:"!h-7 !min-h-0 shrink-0 whitespace-nowrap !px-2 !py-1 text-xs",style:{margin:0},disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("↓ 备份")]),_:1},8,["disabled"]),'
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
@@ -111,6 +109,12 @@ elif 'id:"oc-backup-file"' not in page:
 
 if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page or '上传文件类型' not in page or '未选择文件' not in page:
     raise SystemExit("ERROR: HigoOS backup importer was not installed: " + ", ".join(marker for marker in ('higoros/openclash/', 'application/octet-stream', 'backupFile.value', 'id:\"oc-backup-file\"', '上传文件类型', '未选择文件') if marker not in page))
+compact_row_anchor = 'Ql={class:"flex flex-wrap gap-3"}'
+compact_row = 'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}'
+if compact_row_anchor in page:
+    page = page.replace(compact_row_anchor, compact_row, 1)
+elif compact_row not in page:
+    raise SystemExit("ERROR: OpenClash native file toolbar layout anchor changed")
 pages[0].write_text(page, encoding="utf-8")
 
 source = lua.read_text(encoding="utf-8")

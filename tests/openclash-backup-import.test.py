@@ -41,9 +41,9 @@ def check_restore_archive_format(temporary):
 
 
 page_source = (
-    'const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
+    'const Ql={class:"flex flex-wrap gap-3"};const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
     'async function Je(){return null}return()=>f.value==="files"?(o(),'
-    'y("section",Hl,[s("div",Ql,[s("div",{class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[s("button",null)])])])):null}});'
+    'y("section",Hl,[s("div",Ql,[s("select",null),s("input",null),s("button",null)])])):null}});'
 )
 lua_source = (
     'function restore_backup(archive)\n\treturn false\nend\n'
@@ -139,9 +139,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}',
         'class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}',
         'class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"',
-        'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}',
-        '配置文件保存在配置目录（/etc/openclash/config）',
-        'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
+        'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
         'application/octet-stream',
         'body:file.slice(offset,offset+65536)',
         'params.operation==="download"?"backup":"upload"',
@@ -165,8 +163,10 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}') != 1 or page.count('class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}') != 1 or page.count('class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"') != 1 or page.count('class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}') != 1:
+    if page.count('class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}') != 1 or page.count('class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}') != 1 or page.count('class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"') != 1 or page.count('Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}') != 1 or 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' in page or '配置文件保存在配置目录（/etc/openclash/config）' in page:
         raise SystemExit("ERROR: OpenClash upload toolbar does not match the native compact layout")
+    if page.count('s("div",Ql,[') != 1 or 's("div",{class:"flex w-full flex-wrap' in page:
+        raise SystemExit("ERROR: OpenClash file creation and upload controls are not in one row")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:

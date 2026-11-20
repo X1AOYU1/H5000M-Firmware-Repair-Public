@@ -52,6 +52,8 @@ jobs:
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
         run: python3 tests/openclash-backup-import.test.py
+      - name: Test OpenClash Meta core path repair
+        run: python3 tests/openclash-meta-core-link.test.py
       - name: Test OpenClash card route
         run: python3 tests/openclash-entry-route.test.py
       - name: Build and verify firmware

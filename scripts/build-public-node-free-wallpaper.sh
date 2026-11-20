@@ -15,6 +15,7 @@ unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
 python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openclash-node-cleanup.txt"
 python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
 python3 scripts/patch-higoros-openclash-entry.py "$OUT/rootfs" | tee "$OUT/openclash-entry-route.txt"
+python3 scripts/patch-openclash-meta-core-link.py "$OUT/rootfs" | tee "$OUT/openclash-meta-core-link.txt"
 
 # Apply the current login-page fix and revise every SPA asset URL afterward.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
@@ -35,6 +36,9 @@ security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 openclash_page = next(assets.glob("OpenClashPage-*.js"))
 openclash_lua = (root / "usr/lib/lua/luci/openclash.lua").read_text(encoding="utf-8")
+openclash_subscribe = (root / "usr/share/openclash/openclash.sh").read_text(encoding="utf-8")
+openclash_core_update = (root / "usr/share/openclash/openclash_core.sh").read_text(encoding="utf-8")
+openclash_controller = (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8")
 plugin_page = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
 router_asset = next((path for path in assets.glob("index-*.js") if 'path:"apps/openclash"' in path.read_text(encoding="utf-8")), None)
 if router_asset is None:
@@ -51,12 +55,33 @@ checks = {
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and 'y("iframe"' not in openclash_page.read_text(encoding="utf-8"),
     "OpenClash app-center button uses its HigoOS route": '[t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v||"").toLowerCase().includes("openclash"))?{path:"/apps/openclash"}' in plugin_page and 'path:"apps/openclash"' in app_router,
-    "HigoOS native-style upload toolbar and safe restore": all(value in openclash_page.read_text(encoding="utf-8") for value in ('id:"oc-backup-file-type"', '上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '↑ 上传', '↓ 备份', 'class:"shrink-0 whitespace-nowrap text-muted",style:{fontSize:"10px"}', 'class:"w-28 h-7 shrink-0 rounded border border-line-1/70 bg-bg-2/50 px-2 text-xs"', 'class:"w-36 h-7 shrink-0 truncate rounded border border-line-1/70 bg-bg-2/50 px-2 py-1 text-xs text-muted",style:{lineHeight:"20px"}', 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"32px"}', '配置文件保存在配置目录（/etc/openclash/config）', 'application/octet-stream', 'body:file.slice(offset,offset+65536)', 'valid=uploadType.value==="backup-file"? /\\.tar(?:\\.gz)?$/i.test(file.name)', 'raw.replace(/<!--[\\s\\S]*?-->/g," ")', 'replace(/<style[^]*?[/]style>/gi," ")')) and '/cgi-bin/luci/higoros/openclash/' in openclash_page.read_text(encoding="utf-8") and 'local allowfile = "/tmp/oc_restore.allow"' in openclash_lua and 'local gzip_archive = magic == "\\31\\139"' in openclash_lua and 'local unsafe_allowed_types = SYS.call' in openclash_lua and 'for index = 1, #allowed do' in openclash_lua and 'for index = 1, #directories do' in openclash_lua and 'for index = 1, #route_files do' in openclash_lua and 'ipairs(' not in openclash_lua and 'uci set openclash.config.core_type=Meta' in openclash_lua and 'uci set openclash.config.enable=0' in openclash_lua and all(value in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8") for value in ('HTTP.getenv("HTTP_COOKIE")', 'HTTP.getenv("HTTP_ORIGIN")', 'HTTP.getenv("HTTP_REFERER")', 'source_host == host', 'function action_higoros_backup()', 'backup = action_backup', 'function action_higoros_upload()', 'HTTP.content()', '#chunk > 65536', 'lower_filename = filename:lower()', 'filename:find("/", 1, true)', 'filename:find("\\\\", 1, true)', 'Backup must be a .tar or .tar.gz archive', 'lower_filename:match("%.tar$")', 'tostring(reason or "备份文件无效或恢复失败")', 'entry({"higoros", "openclash", "backup"}', 'higoros_backup_entry.sysauth = false', 'entry({"higoros", "openclash", "upload"}', 'higoros_upload_entry.sysauth = false')) and 'Backup archive exceeds 128 MiB limit' in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8"),
+    "Meta core canonical executable link repaired": all(value in openclash_subscribe for value in ('ensure_meta_core_compat_link()', 'ensure_meta_core_compat_link || {', '/etc/openclash/core/clash_meta', '/tmp/etc/openclash/core/clash_meta')) and 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in openclash_core_update,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
     "package market UI": package is not None,
 }
+upload_ui = (
+    'id:"oc-backup-file-type"' in openclash_page.read_text(encoding="utf-8")
+    and all(value in openclash_page.read_text(encoding="utf-8") for value in (
+        '选择文件', '未选择文件', '↑ 上传', '↓ 备份',
+        'Ql={class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto"}',
+        'body:file.slice(offset,offset+65536)',
+    ))
+    and 'class:"flex w-full flex-nowrap items-center gap-1 overflow-x-auto",style:' not in openclash_page.read_text(encoding="utf-8")
+    and '配置文件保存在配置目录（/etc/openclash/config）' not in openclash_page.read_text(encoding="utf-8")
+)
+upload_backend = all(value in openclash_controller for value in (
+    'function action_higoros_backup()', 'function action_higoros_upload()',
+    'HTTP.getenv("HTTP_COOKIE")', 'HTTP.getenv("HTTP_ORIGIN")',
+    'HTTP.getenv("HTTP_REFERER")', 'HTTP.content()', '#chunk > 65536',
+    'Backup archive exceeds 128 MiB limit',
+)) and all(value in openclash_lua for value in (
+    'local allowfile = "/tmp/oc_restore.allow"',
+    'uci set openclash.config.core_type=Meta',
+    'uci set openclash.config.enable=0',
+))
+checks["HigoOS single-row upload, backup, and safe restore"] = upload_ui and upload_backend
 for label, passed in checks.items():
     if not passed:
         raise SystemExit(f"ERROR: complete-repair feature missing after node cleanup: {label}")
