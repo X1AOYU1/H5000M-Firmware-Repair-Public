@@ -63,7 +63,6 @@ jobs:
             output/openclash-backup-import.txt
             output/openclash-node-cleanup.txt
             output/frontend-asset-revision.txt
-            output/higoros-api-inspection.txt
           retention-days: 30
       - name: Publish verified firmware release
         uses: softprops/action-gh-release@v2

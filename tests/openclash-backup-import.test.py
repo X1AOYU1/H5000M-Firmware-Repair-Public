@@ -55,9 +55,10 @@ with tempfile.TemporaryDirectory() as temporary:
         'form.target=frame.name',
         'input.disabled=!1;form.submit()',
         'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
-        'frame.contentDocument.body.textContent',
+        'const before=JSON.stringify(ke.value.map(row=>[row.category,row.name,row.size]))',
+        'const after=JSON.stringify(ke.value.map(row=>[row.category,row.name,row.size]))',
         '上传等待超时，请检查路由器连接后重试',
-        '服务器返回了非 JSON 响应',
+        'HigoOS 未检测到备份文件变化',
         '导入 OpenClash 备份 (.tar.gz)',
         '/cgi-bin/luci/admin/services/openclash/restore_backup',
     )
@@ -77,6 +78,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: repeated backup patching duplicated the importer")
     if "fetch(\"/cgi-bin/luci/admin/services/openclash/restore_backup\"" in page:
         raise SystemExit("ERROR: backup upload still uses fetch against the LuCI CGI endpoint")
+    if "frame.contentDocument" in page:
+        raise SystemExit("ERROR: backup upload response still assumes the LuCI frame is same-origin")
     if page.index('frame.onload=()=>{clearTimeout(initTimer);resolve()}') > page.index('document.body.append(frame,form)'):
         raise SystemExit("ERROR: backup iframe load handler is registered after insertion")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:

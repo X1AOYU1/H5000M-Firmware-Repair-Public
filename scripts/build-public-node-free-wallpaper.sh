@@ -11,7 +11,6 @@ tar -xf "$IMAGE" -C "$OUT/tar"
 root="$(find "$OUT/tar" -type f -name root -print -quit)"
 [[ -n "$root" ]] || { echo "ERROR: firmware root SquashFS missing"; exit 3; }
 unsquashfs -no-progress -d "$OUT/rootfs" "$root" >/dev/null
-python3 scripts/inspect-higoros-openclash-api.py "$OUT/rootfs" "$OUT/higoros-api-inspection.txt"
 
 python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openclash-node-cleanup.txt"
 python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
