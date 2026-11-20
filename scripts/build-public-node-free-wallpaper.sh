@@ -154,7 +154,7 @@ configs = Path(sys.argv[2])
 assert not (configs / "dy.yaml").exists() and not (configs / "127.0.0.1.yaml").exists()
 openclash = next(Path(sys.argv[3]).glob("OpenClashPage-*.js")).read_text(encoding="utf-8")
 assert len(openclash) > 1000 and 'y("iframe"' not in openclash
-assert all(value in openclash for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar.gz)', '选择文件', '未选择文件', '上传', '备份'))
+assert all(value in openclash for value in ('上传文件类型：', '配置文件 (.yaml)', '代理文件', '规则集文件', '[Meta] 内核文件 (.tar.gz)', '备份文件 (.tar/.tar.gz)', '选择文件', '未选择文件', '上传', '备份'))
 PY
 sha256sum "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/SHA256SUMS.txt"
 stat -c 'SIZE_BYTES=%s' "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" | tee "$OUT/firmware-size.txt"
