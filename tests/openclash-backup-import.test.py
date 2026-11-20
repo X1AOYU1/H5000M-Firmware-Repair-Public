@@ -1,13 +1,45 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import io
 import subprocess
 import shutil
 import sys
 import tempfile
 import re
+import tarfile
 
 
 repo = Path(__file__).resolve().parents[1]
+
+
+def check_restore_archive_format(temporary):
+    members = {
+        "./openclash": b"config openclash 'config'\n option config_path '/etc/openclash/config/main.yaml'\n",
+        "./config/main.yaml": b"proxies: []\nproxy-groups: []\nrules: [MATCH,DIRECT]\n",
+        "./custom/custom_rules.list": b"",
+        "./core/clash_meta": b"incompatible donor core",
+    }
+    for suffix, mode in (("tar", "w"), ("tar.gz", "w:gz")):
+        archive = Path(temporary) / f"openclash-fixture.{suffix}"
+        with tarfile.open(archive, mode) as output:
+            for name, body in members.items():
+                item = tarfile.TarInfo(name)
+                item.size = len(body)
+                output.addfile(item, io.BytesIO(body))
+            link = tarfile.TarInfo("./clash")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "/etc/openclash/core/clash_meta"
+            output.addfile(link)
+        with tarfile.open(archive, "r:*") as source:
+            names = [entry.name.rstrip("/") for entry in source]
+        normalized = [name.removeprefix("./") for name in names]
+        assert "openclash" in normalized
+        assert "config/main.yaml" in normalized
+        assert "core/clash_meta" in normalized
+        assert "clash" in normalized
+        assert (archive.read_bytes()[:2] == b"\x1f\x8b") == suffix.endswith(".gz")
+
+
 page_source = (
     'const ma=el({setup(){const ve=g("config"),X=g(""),he=W(()=>true);'
     'async function Je(){return null}return()=>f.value==="files"?(o(),'
@@ -46,6 +78,7 @@ controller_source = (
 )
 
 with tempfile.TemporaryDirectory() as temporary:
+    check_restore_archive_format(temporary)
     root = Path(temporary)
     assets = root / "usr/share/higoros/web/assets"
     assets.mkdir(parents=True)
@@ -103,7 +136,9 @@ with tempfile.TemporaryDirectory() as temporary:
         '未选择文件',
         '上传',
         'd("备份")',
-        'class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}',
+        'class:"shrink-0 whitespace-nowrap text-xs text-muted"',
+        'class:"min-w-40 flex-1 truncate text-xs text-muted"',
+        '配置文件保存在配置目录（/etc/openclash/config）',
         'class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[',
         'application/octet-stream',
         'body:file.slice(offset,offset+65536)',
@@ -128,8 +163,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup upload still depends on unsupported custom-file authorization")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"未选择文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
-    if page.count('class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
-        raise SystemExit("ERROR: native upload row and existing file controls are not separated")
+    if page.count('class:"shrink-0 whitespace-nowrap text-xs text-muted"') != 1 or page.count('class:"min-w-40 flex-1 truncate text-xs text-muted"') != 1 or page.count('class:"flex w-full flex-wrap items-center gap-2",style:{width:"100%",flexBasis:"100%"}},[') != 1:
+        raise SystemExit("ERROR: OpenClash upload toolbar does not match the native compact layout")
     if 'id:"oc-backup-file",type:"file",accept:".tar,.tar.gz,application/x-tar,application/gzip",disabled:' in page:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
@@ -138,7 +173,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: native file type upload endpoint is incomplete")
     if 'entry({"higoros", "openclash", "backup"}' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint:
         raise SystemExit("ERROR: backup download endpoint is still behind the LuCI admin route")
-    if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
+    if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint or 'tostring(reason or "备份文件无效或恢复失败")' not in endpoint:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
     if 'oc_restore_entry.sysauth = false' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint or 'HTTP.getenv("HTTP_COOKIE")' not in endpoint or 'HigoOS session is invalid or expired' not in endpoint:
         raise SystemExit("ERROR: HigoOS cookie-session authorization is incomplete")
@@ -160,6 +195,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup filename validation rejects normal names or permits unsafe paths")
     if 'tar_list_options = gzip_archive and "tzf " or "tf "' not in backend or 'tar_extract_options = gzip_archive and "-xzf " or "-xf "' not in backend:
         raise SystemExit("ERROR: .tar and .tar.gz extraction modes are incomplete")
+    if r'local gzip_archive = magic == "\31\139"' not in backend or 'local normalized = line:gsub("^%./", "")' not in backend or 'local unsafe_allowed_types = SYS.call' not in backend:
+        raise SystemExit("ERROR: restore does not detect actual archive format and filter donor core links safely")
     if "core/" in backend or "GeoIP.dat" in backend or "Model.bin" in backend:
         raise SystemExit("ERROR: filtered restore includes donor core, geo, or Smart model data")
 

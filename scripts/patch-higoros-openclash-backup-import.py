@@ -89,8 +89,8 @@ toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     toolbar_anchor +
     's("div",{class:"flex w-full flex-nowrap items-center gap-2 overflow-x-auto",style:{width:"100%",flexBasis:"100%",minHeight:"48px"}},['
-    's("label",{for:"oc-backup-file-type",class:"text-sm text-muted"},"上传文件类型："),'
-    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
+    's("label",{for:"oc-backup-file-type",class:"shrink-0 whitespace-nowrap text-xs text-muted"},"上传文件类型："),'
+    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"w-36 shrink-0 rounded border border-line-1/70 bg-bg-2/50 p-2 text-xs",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
     's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
     's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar/.tar.gz)")]),'
     's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":uploadType.value==="backup-file"?".tar,.tar.gz,application/x-tar,application/gzip":".tar.gz,application/gzip",style:{display:"none"},'
@@ -98,10 +98,11 @@ toolbar_replacement = (
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
     'm(i(p),{variant:"primary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
     '{default:r(()=>[d("选择文件",-1)]),_:1},8,["disabled"]),'
-    's("span",{class:"text-sm text-muted max-w-64 truncate"},backupFile.value?.name||"未选择文件"),'
+    's("span",{class:"min-w-40 flex-1 truncate text-xs text-muted"},backupFile.value?.name||"未选择文件"),'
     'm(i(p),{variant:"secondary",disabled:t.value||!backupFile.value,onClick:uploadBackup},'
     '{default:r(()=>[d("上传",-1)]),_:1},8,["disabled"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:downloadBackup},{default:r(()=>[d("备份")]),_:1},8,["disabled"]),]),'
+    's("p",{class:"mt-1 w-full text-center text-xs text-muted"},"配置文件保存在配置目录（/etc/openclash/config）"),'
 )
 if 'id:"oc-backup-file"' not in page and page.count(toolbar_anchor) == 1:
     page = page.replace(toolbar_anchor, toolbar_replacement, 1)
@@ -122,35 +123,39 @@ replacement = r'''function restore_backup(archive)
 	local listfile = "/tmp/oc_restore.list"
 	local allowfile = "/tmp/oc_restore.allow"
 	local stage = "/tmp/oc_restore_stage"
-	local restored = false
-	local gzip_archive = archive:match("%.tar%.gz$") ~= nil
+	local restored, failure = false, "备份归档格式无法读取"
+	local archive_fp = io.open(archive, "rb")
+	local magic = archive_fp and archive_fp:read(2) or ""
+	if archive_fp then archive_fp:close() end
+	local gzip_archive = magic == "\31\139"
 	local tar_list_options = gzip_archive and "tzf " or "tf "
 	local tar_verbose_options = gzip_archive and "tvzf " or "tvf "
 	local tar_extract_options = gzip_archive and "-xzf " or "-xf "
 	local tarok = SYS.call("tar " .. tar_list_options .. quoted .. " >" .. listfile .. " 2>/dev/null") == 0
 	local has_profile, unsafe = false, false
 	local allowed, count = {}, 0
-	local unsafe_types = SYS.call("tar " .. tar_verbose_options .. quoted .. " 2>/dev/null | grep -qE '^[bcp lhs]'") == 0
-	if tarok and not unsafe_types then
+	if tarok then
 		for line in io.lines(listfile) do
 			line = line:gsub("/$", "")
 			if line:match("^/") or line:match("^%.%./") or line:find("/../", 1, true) or line:sub(-3) == "/.." then unsafe = true end
-			local category, name = line:match("^%./([%w_%-]+)/([^/]+)$")
+			local normalized = line:gsub("^%./", "")
+			local category, name = normalized:match("^([%w_%-]+)/([^/]+)$")
 			if name and not name:match("^[%w_.%-]+$") then unsafe = true end
-			local ok = line == "./openclash"
+			local ok = normalized == "openclash"
 				or (category == "config" and name and name:match("%.ya?ml$"))
 				or ((category == "custom" or category == "overwrite" or category == "proxy_provider" or category == "rule_provider") and name ~= nil)
-				or line == "./china_ip_route.ipset"
-				or line == "./china_ip6_route.ipset"
+				or normalized == "china_ip_route.ipset"
+				or normalized == "china_ip6_route.ipset"
 			if ok then
 				count = count + 1
 				if count > 2048 then unsafe = true; break end
 				allowed[#allowed + 1] = line
-				if line:match("^%./config/[%w_.%-]+%.ya?ml$") then has_profile = true end
+				if category == "config" and name and name:match("%.ya?ml$") then has_profile = true end
 			end
 		end
 	end
-	if tarok and not unsafe_types and has_profile and not unsafe then
+	local unsafe_allowed_types = SYS.call("tar " .. tar_verbose_options .. quoted .. " 2>/dev/null | grep -qE '^[lh].*[[:space:]](\\./)?(openclash|config(/[^[:space:]]*)?|custom(/[^[:space:]]*)?|overwrite(/[^[:space:]]*)?|proxy_provider(/[^[:space:]]*)?|rule_provider(/[^[:space:]]*)?|china_ip6?_route\\.ipset)([[:space:]]|$)'") == 0
+	if tarok and has_profile and not unsafe and not unsafe_allowed_types then
 		local allow = io.open(allowfile, "w")
 		if allow then
 			for _, path in ipairs(allowed) do allow:write(path, "\n") end
@@ -172,7 +177,7 @@ replacement = r'''function restore_backup(archive)
 					end
 				end
 				if not selected or not selected:match("^[%w_.%-]+%.ya?ml$") or SYS.call("test -f " .. UTIL.shellquote(config_dir .. "/" .. selected)) ~= 0 then
-					selected = SYS.exec("find " .. UTIL.shellquote(config_dir) .. " -maxdepth 1 -type f -name '*.yaml' -print -quit")
+					selected = SYS.exec("find " .. UTIL.shellquote(config_dir) .. " -maxdepth 1 -type f \\( -name '*.yaml' -o -name '*.yml' \\) -print -quit")
 					selected = selected and selected:match("([^/]+)\n?$")
 				end
 				if selected and selected:match("^[%w_.%-]+%.ya?ml$") then
@@ -198,12 +203,21 @@ replacement = r'''function restore_backup(archive)
 					ok = ok and SYS.call("uci set openclash.config.config_path=" .. UTIL.shellquote("/etc/openclash/config/" .. selected)) == 0
 					ok = ok and SYS.call("uci set openclash.config.enable=0 && uci set openclash.config.core_type=Meta && uci set openclash.config.interface_name=br-lan && uci set openclash.config.lan_interface_name=br-lan && uci set openclash.config.en_mode=fake-ip-tun && uci set openclash.config.smart_enable=0 && uci set openclash.config.auto_smart_switch=0 && uci set openclash.config.smart_enable_lgbm=0 && uci -q delete openclash.config.stack_type && uci commit openclash") == 0
 					restored = ok
+					if not ok then failure = "配置或资源文件写入失败" end
 				end
+			else
+				failure = "备份归档提取失败"
 			end
+		else
+			failure = "备份内没有可用的 YAML 主配置"
 		end
+	elseif not tarok then
+		failure = "备份不是有效的 TAR 或 TAR.GZ 归档"
+	elseif unsafe or unsafe_allowed_types then
+		failure = "备份包含不安全的路径或文件类型"
 	end
 	SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " " .. UTIL.shellquote(listfile) .. " " .. UTIL.shellquote(allowfile))
-	return restored
+	return restored, failure
 end
 '''
 lua.write_text(source[:start] + replacement + source[end:], encoding="utf-8")
@@ -317,10 +331,10 @@ function action_higoros_upload()
 		fp:close()
 		if size == 0 then fs.unlink(path); return respond("error", "上传文件为空") end
 		if upload_type == "backup-file" then
-			local ok, restored = pcall(fs.restore_backup, path)
+			local ok, restored, reason = pcall(fs.restore_backup, path)
 			fs.unlink(path)
 			if not ok then return respond("error", "备份恢复错误：" .. tostring(restored):sub(1, 512)) end
-			if not restored then return respond("error", "备份文件无效或恢复失败") end
+			if not restored then return respond("error", tostring(reason or "备份文件无效或恢复失败")) end
 			return respond("success", "备份已导入，OpenClash 保持关闭")
 		elseif upload_type == "clash_meta" then
 			local list = SYS.exec("tar -tzf " .. UTIL.shellquote(path) .. " 2>/dev/null") or ""
