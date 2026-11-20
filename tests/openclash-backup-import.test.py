@@ -67,22 +67,33 @@ with tempfile.TemporaryDirectory() as temporary:
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
-        'id:"oc-backup-file",type:"file",accept:backupFormat.value==="tar"?".tar,application/x-tar":".tar.gz,application/gzip",style:{display:"none"}',
+        'id:"oc-backup-file-type",value:uploadType.value',
+        'uploadType=g("config")',
+        'value:"config"}',
+        'value:"proxy-provider"}',
+        'value:"rule-provider"}',
+        'value:"clash_meta"}',
+        'value:"backup-file"}',
+        '配置文件 (.yaml)',
+        '代理文件',
+        '规则集文件',
+        '[Meta] 内核文件 (.tar.gz)',
+        '备份文件 (.tar.gz)',
+        'uploadType.value==="backup-file"||uploadType.value==="clash_meta"',
+        'id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":".tar.gz,application/gzip",style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"未选择文件"',
         'async function downloadBackup()',
-        'backupFormat=g("tar.gz")',
+        'raw.replace(/<[^>]*>/g," ")',
         'backup_type:"backup"',
-        '上传文件类型',
-        '备份文件 (.tar.gz)',
-        '备份文件 (.tar)',
+        '上传文件类型：',
         '选择文件',
         '未选择文件',
         '上传',
         'd("备份")',
         'class:"flex flex-wrap items-center gap-2"',
         'application/octet-stream',
-        'body:file.slice(offset,offset+1048576)',
+        'body:file.slice(offset,offset+262144)',
         'params.operation==="download"?"backup":"upload"',
         '/cgi-bin/luci/higoros/openclash/',
     )
@@ -110,8 +121,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
-    if 'function action_higoros_upload()' not in endpoint or 'HTTP.content()' not in endpoint or 'current ~= offset' not in endpoint or 'higoros_upload_entry.sysauth = false' not in endpoint or 'entry({"higoros", "openclash", "upload"}' not in endpoint:
-        raise SystemExit("ERROR: raw chunked backup upload endpoint is incomplete")
+    if 'function action_higoros_upload()' not in endpoint or 'HTTP.content()' not in endpoint or 'current ~= offset' not in endpoint or '#chunk > 262144' not in endpoint or 'higoros_upload_entry.sysauth = false' not in endpoint or 'entry({"higoros", "openclash", "upload"}' not in endpoint or 'config = { dir = "/etc/openclash/config"' not in endpoint or 'clash_meta = { suffix = filename:match("%.tar%.gz$") and true }' not in endpoint or 'header:byte(19) == 183' not in endpoint:
+        raise SystemExit("ERROR: native file type upload endpoint is incomplete")
     if 'entry({"higoros", "openclash", "backup"}' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint:
         raise SystemExit("ERROR: backup download endpoint is still behind the LuCI admin route")
     if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:

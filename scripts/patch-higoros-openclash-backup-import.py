@@ -14,8 +14,8 @@ if len(pages) != 1 or not lua.is_file() or not controller.is_file():
 
 page = pages[0].read_text(encoding="utf-8")
 state_anchor = 've=g("config"),X=g(""),he=W(()=>'
-state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),backupFormat=g("tar.gz"),he=W', 1)
-if 'backupFile=g(null),backupFormat=g("tar.gz"),he=W(()=>' in page:
+state_replacement = state_anchor.replace('he=W', 'backupFile=g(null),uploadType=g("config"),he=W', 1)
+if 'backupFile=g(null),uploadType=g("config"),he=W(()=>' in page:
     pass
 elif page.count(state_anchor) == 1:
     page = page.replace(state_anchor, state_replacement, 1)
@@ -25,7 +25,7 @@ else:
 method_anchor = 'async function Je(){'
 method = (
     'async function backupRequest(params,options={}){const path=params.operation==="download"?"backup":"upload";const response=await fetch("/cgi-bin/luci/higoros/openclash/"+path+"?"+new URLSearchParams(params),{credentials:"same-origin",...options});'
-    'if(!response.ok){const message=await response.text();throw new Error(message||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
+    'if(!response.ok){const raw=await response.text(),message=raw.replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim().slice(0,240);throw new Error(message||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
     'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
     'const response=await backupRequest({operation:"download",backup_type:"backup"});'
     'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
@@ -33,14 +33,14 @@ method = (
     'const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=match?match[1]:"OpenClash-backup.tar.gz";'
     'document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);V.value="备份已生成并下载"'
     '}catch(error){U(error)}finally{t.value=!1}}'
-    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;if(backupFormat.value==="tar"?!file.name.toLowerCase().endsWith(".tar"):!file.name.toLowerCase().endsWith(".tar.gz")){U(new Error("所选文件与上传类型不一致"));return}const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
+    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value,archiveType=uploadType.value==="backup-file"||uploadType.value==="clash_meta",valid=archiveType?file.name.toLowerCase().endsWith(".tar.gz"): /\\.ya?ml$/i.test(file.name);if(!valid){U(new Error(archiveType?"此类型需要 .tar.gz 文件":"此类型需要 .yaml 或 .yml 文件"));return}const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
     't.value=!0;V.value="正在安全导入备份";let started=!1;try{'
-    'await backupRequest({operation:"start",upload_id:id,filename:file.name},{method:"POST"});started=!0;'
-    'for(let offset=0;offset<file.size;offset+=1048576){V.value="正在上传备份 "+Math.min(100,Math.round((offset+1048576)/file.size*100))+"%";'
-    'await backupRequest({operation:"chunk",upload_id:id,filename:file.name,offset:String(offset)},{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file.slice(offset,offset+1048576)})}'
-    'const response=await backupRequest({operation:"finish",upload_id:id,filename:file.name},{method:"POST"});const result=await response.json();'
+    'await backupRequest({operation:"start",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"});started=!0;'
+    'for(let offset=0;offset<file.size;offset+=262144){V.value="正在上传备份 "+Math.min(100,Math.round((offset+262144)/file.size*100))+"%";'
+    'await backupRequest({operation:"chunk",upload_id:id,filename:file.name,upload_type:uploadType.value,offset:String(offset)},{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file.slice(offset,offset+262144)})}'
+    'const response=await backupRequest({operation:"finish",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"});const result=await response.json();'
     'if(result.status!=="success")throw new Error(result.message||"备份导入失败");started=!1;backupFile.value=null;await N();V.value=result.message||"备份已导入，OpenClash 保持关闭"'
-    '}catch(error){if(started)try{await backupRequest({operation:"cancel",upload_id:id,filename:file.name},{method:"POST"})}catch{}U(error)}finally{t.value=!1}}'
+    '}catch(error){if(started)try{await backupRequest({operation:"cancel",upload_id:id,filename:file.name,upload_type:uploadType.value},{method:"POST"})}catch{}U(error)}finally{t.value=!1}}'
 )
 if "async function uploadBackup()" not in page and page.count(method_anchor) == 1:
     page = page.replace(method_anchor, method + method_anchor, 1)
@@ -51,10 +51,11 @@ toolbar_anchor = 'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
 toolbar_replacement = (
     'f.value==="files"?(o(),y("section",Hl,[s("div",Ql,['
     's("div",{class:"flex flex-wrap items-center gap-2"},['
-    's("span",{class:"text-sm text-muted"},"上传文件类型"),'
-    's("select",{value:backupFormat.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{backupFormat.value=e.target.value;backupFile.value=null}},['
-    's("option",{value:"tar.gz"},"备份文件 (.tar.gz)"),s("option",{value:"tar"},"备份文件 (.tar)")]),'
-    's("input",{id:"oc-backup-file",type:"file",accept:backupFormat.value==="tar"?".tar,application/x-tar":".tar.gz,application/gzip",style:{display:"none"},'
+    's("label",{for:"oc-backup-file-type",class:"text-sm text-muted"},"上传文件类型："),'
+    's("select",{id:"oc-backup-file-type",value:uploadType.value,disabled:t.value,"aria-label":"上传文件类型",class:"rounded border border-line-1/70 bg-bg-2/50 p-2",onChange:e=>{uploadType.value=e.target.value;backupFile.value=null;const input=document.getElementById("oc-backup-file");if(input)input.value=""}},['
+    's("option",{value:"config"},"配置文件 (.yaml)"),s("option",{value:"proxy-provider"},"代理文件"),s("option",{value:"rule-provider"},"规则集文件"),'
+    's("option",{value:"clash_meta"},"[Meta] 内核文件 (.tar.gz)"),s("option",{value:"backup-file"},"备份文件 (.tar.gz)")]),'
+    's("input",{id:"oc-backup-file",type:"file",accept:uploadType.value==="config"||uploadType.value==="proxy-provider"||uploadType.value==="rule-provider"?".yaml,.yml":".tar.gz,application/gzip",style:{display:"none"},'
     'onChange:e[62]||(e[62]=l=>backupFile.value=l.target.files?.[0]||null),'
     'class:"rounded border border-line-1/70 bg-bg-2/50 p-2"},null,8,["accept","onChange"]),'
     'm(i(p),{variant:"secondary",disabled:t.value,onClick:()=>document.getElementById("oc-backup-file")?.click()},'
@@ -238,41 +239,92 @@ function action_higoros_upload()
 	if not higoros_session_valid() then return respond("error", "HigoOS session is invalid or expired; sign in again") end
 	local operation = HTTP.formvalue("operation") or ""
 	local id = HTTP.formvalue("upload_id") or ""
-	local filename = (HTTP.formvalue("filename") or ""):lower()
+	local filename = HTTP.formvalue("filename") or ""
+	local upload_type = HTTP.formvalue("upload_type") or ""
 	if not id:match("^[a-f0-9]+$") or #id ~= 32 then return respond("error", "Invalid upload id") end
-	local suffix = filename:match("%.tar%.gz$") and ".tar.gz" or (filename:match("%.tar$") and ".tar" or nil)
-	if not suffix then return respond("error", "Backup must be a .tar or .tar.gz archive") end
-	local path = "/tmp/higoos_openclash_" .. id .. suffix
+	if not filename:match("^[%w_.%-]+$") or filename:match("^%.") then return respond("error", "Invalid upload filename") end
+	local types = {
+		config = { dir = "/etc/openclash/config", suffix = filename:match("%.ya?ml$") and true },
+		["proxy-provider"] = { dir = "/etc/openclash/proxy_provider", suffix = filename:match("%.ya?ml$") and true },
+		["rule-provider"] = { dir = "/etc/openclash/rule_provider", suffix = filename:match("%.ya?ml$") and true },
+		clash_meta = { suffix = filename:match("%.tar%.gz$") and true },
+		["backup-file"] = { suffix = filename:match("%.tar%.gz$") and true }
+	}
+	if not types[upload_type] or not types[upload_type].suffix then return respond("error", "文件名后缀与上传类型不匹配") end
+	local path = "/tmp/higoos_openclash_" .. id
 	if operation == "start" then
 		local fp = io.open(path, "wb")
-		if not fp then return respond("error", "Unable to create temporary backup file") end
+		if not fp then return respond("error", "无法创建临时上传文件") end
 		fp:close()
 		return respond("success", "Upload started")
 	elseif operation == "chunk" then
 		local chunk = HTTP.content() or ""
 		local offset = tonumber(HTTP.formvalue("offset") or "")
-		if #chunk == 0 or #chunk > 1048576 or not offset or offset < 0 then return respond("error", "Invalid backup upload chunk") end
+        if #chunk == 0 or #chunk > 262144 or not offset or offset < 0 then return respond("error", "上传数据块无效") end
 		local fp = io.open(path, "r+b")
-		if not fp then return respond("error", "Backup upload has expired; start again") end
+		if not fp then return respond("error", "上传已过期，请重新开始") end
 		local current = fp:seek("end") or 0
-		if current ~= offset or current + #chunk > 134217728 then fp:close(); return respond("error", "Backup upload offset or size is invalid") end
+		if current ~= offset or current + #chunk > 134217728 then fp:close(); return respond("error", "上传位置或文件大小无效") end
 		fp:write(chunk)
 		fp:close()
-		return respond("success", "Chunk received")
+		return respond("success", "数据块已接收")
 	elseif operation == "cancel" then
 		fs.unlink(path)
-		return respond("success", "Upload cancelled")
+		return respond("success", "上传已取消")
 	elseif operation == "finish" then
 		local fp = io.open(path, "rb")
-		if not fp then return respond("error", "Backup upload file is missing") end
+		if not fp then return respond("error", "上传文件不存在") end
 		local size = fp:seek("end") or 0
 		fp:close()
-		if size == 0 then fs.unlink(path); return respond("error", "Backup file is empty") end
-		local ok, restored = pcall(fs.restore_backup, path)
-		fs.unlink(path)
-		if not ok then return respond("error", "Backup restore error: " .. tostring(restored):sub(1, 512)) end
-		if not restored then return respond("error", "Backup File Restore Failed") end
-		return respond("success", "Backup imported; OpenClash remains disabled")
+		if size == 0 then fs.unlink(path); return respond("error", "上传文件为空") end
+		if upload_type == "backup-file" then
+			local ok, restored = pcall(fs.restore_backup, path)
+			fs.unlink(path)
+			if not ok then return respond("error", "备份恢复错误：" .. tostring(restored):sub(1, 512)) end
+			if not restored then return respond("error", "备份文件无效或恢复失败") end
+			return respond("success", "备份已导入，OpenClash 保持关闭")
+		elseif upload_type == "clash_meta" then
+			local list = SYS.exec("tar -tzf " .. UTIL.shellquote(path) .. " 2>/dev/null") or ""
+			local verbose = SYS.exec("tar -tvzf " .. UTIL.shellquote(path) .. " 2>/dev/null") or ""
+			local core_member
+			for member in list:gmatch("[^\r\n]+") do
+				member = member:gsub("/$", "")
+				if member == "./clash_meta" or member == "clash_meta" then core_member = member end
+				if member:match("^/") or member:match("%.%./") or member:find("/../", 1, true) then fs.unlink(path); return respond("error", "内核压缩包包含不安全路径") end
+			end
+			local regular_core = false
+			for line in verbose:gmatch("[^\r\n]+") do
+				if line:sub(1, 1) == "-" and line:match("%s+%./?clash_meta$") then regular_core = true end
+			end
+			if not core_member or not regular_core then fs.unlink(path); return respond("error", "压缩包中未找到普通文件格式的 clash_meta 内核") end
+			local stage = "/tmp/higoos_openclash_core_" .. id
+			local allow = stage .. ".list"
+			SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " && mkdir -p " .. UTIL.shellquote(stage))
+			local list_fp = io.open(allow, "w")
+			if list_fp then list_fp:write(core_member, "\n"); list_fp:close() end
+			local extracted = list_fp and SYS.call("tar -C " .. UTIL.shellquote(stage) .. " -xzf " .. UTIL.shellquote(path) .. " -T " .. UTIL.shellquote(allow) .. " >/dev/null 2>&1") == 0
+			local core_path = stage .. "/clash_meta"
+			local core_fp = extracted and io.open(core_path, "rb")
+			local header = core_fp and core_fp:read(20) or ""
+			if core_fp then core_fp:close() end
+			local arm64 = #header == 20 and header:byte(1) == 127 and header:sub(2, 4) == "ELF" and header:byte(5) == 2 and header:byte(6) == 1 and header:byte(19) == 183 and header:byte(20) == 0
+			if not arm64 then SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " " .. UTIL.shellquote(allow)); fs.unlink(path); return respond("error", "内核文件不是 ARM64 Meta ELF，已拒绝安装") end
+			local core_dir = meta_core_path:match("(.+)/[^/]+$") or "/etc/openclash/core"
+			local ok = SYS.call("mkdir -p " .. UTIL.shellquote(core_dir) .. " && cp -f " .. UTIL.shellquote(core_path) .. " " .. UTIL.shellquote(meta_core_path) .. " && chmod 755 " .. UTIL.shellquote(meta_core_path)) == 0
+			SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " " .. UTIL.shellquote(allow)); fs.unlink(path)
+			if not ok then return respond("error", "Meta 内核安装失败") end
+			return respond("success", "ARM64 Meta 内核已安装")
+		else
+			local fp = io.open(path, "rb")
+			local content = fp and fp:read(8192) or ""
+			if fp then fp:close() end
+			if upload_type == "config" and not (content:find("proxies:", 1, true) or content:find("proxy%-providers:") or content:find("rules:", 1, true) or content:find("port:", 1, true)) then fs.unlink(path); return respond("error", "配置文件缺少有效 YAML 配置段") end
+			local target = types[upload_type].dir .. "/" .. filename
+			local ok = SYS.call("mkdir -p " .. UTIL.shellquote(types[upload_type].dir) .. " && cp -f " .. UTIL.shellquote(path) .. " " .. UTIL.shellquote(target) .. " && chmod 644 " .. UTIL.shellquote(target)) == 0
+			fs.unlink(path)
+			if not ok then return respond("error", "文件保存失败") end
+			return respond("success", "文件已保存到 " .. types[upload_type].dir)
+		end
 	end
 	return respond("error", "Unsupported upload operation")
 end
