@@ -176,8 +176,8 @@ session_helper = r'''local function higoros_session_valid()
 	local cookie = HTTP.getenv("HTTP_COOKIE") or ""
 	local lan_ip = SYS.exec("uci -q get network.lan.ipaddr 2>/dev/null") or ""
 	lan_ip = lan_ip:match("([0-9]+%.[0-9]+%.[0-9]+%.[0-9]+)")
-	if #cookie > 8192 or not cookie:find("higo%-mesh%-view%-") or not lan_ip then return false end
-	local status = SYS.exec("curl --noproxy '*' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%{http_code}' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")
+	if #cookie == 0 or #cookie > 8192 or not lan_ip then return false end
+	local status = SYS.exec("curl --noproxy '*' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%{http_code}' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " -H " .. UTIL.shellquote("Accept: application/json") .. " -H " .. UTIL.shellquote("Origin: http://" .. lan_ip) .. " -H " .. UTIL.shellquote("Referer: http://" .. lan_ip .. "/") .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")
 	return status and status:match("(%d%d%d)") == "200"
 end
 '''

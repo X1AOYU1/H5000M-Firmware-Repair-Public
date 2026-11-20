@@ -118,7 +118,7 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
     if 'oc_restore_entry.sysauth = false' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint or 'HTTP.getenv("HTTP_COOKIE")' not in endpoint or 'HigoOS session is invalid or expired' not in endpoint:
         raise SystemExit("ERROR: HigoOS cookie-session authorization is incomplete")
-    if 'curl --noproxy' not in endpoint or 'Cookie: " .. cookie' not in endpoint or '/api/v1/auth/me' not in endpoint:
+    if 'curl --noproxy' not in endpoint or 'Cookie: " .. cookie' not in endpoint or 'Origin: http://' not in endpoint or 'Referer: http://' not in endpoint or '/api/v1/auth/me' not in endpoint or 'cookie:find(' in endpoint:
         raise SystemExit("ERROR: upload endpoint does not validate the HigoOS session")
     backup_actions = (
         'backup = action_backup',
