@@ -122,6 +122,7 @@ try {
   };
   const report = JSON.stringify(diagnostics, null, 2) + "\n";
   await (await import("node:fs/promises")).writeFile(reportPath, report, "utf8");
+  process.stderr.write(`::error title=OpenClash click audit::${JSON.stringify(diagnostics)}\n`);
   process.stderr.write(report);
   throw error;
 } finally {
