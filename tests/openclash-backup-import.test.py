@@ -48,11 +48,12 @@ with tempfile.TemporaryDirectory() as temporary:
     backend = lua.read_text(encoding="utf-8")
     endpoint = controller.read_text(encoding="utf-8")
     required_page = (
-        'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:t.value,style:{display:"none"}',
+        'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",style:{display:"none"}',
         'document.getElementById("oc-backup-file")?.click()',
         'backupFile.value?.name||"选择备份文件"',
         'form.enctype="multipart/form-data"',
         'form.target=frame.name',
+        'input.disabled=!1;form.submit()',
         'const ready=new Promise((resolve,reject)=>{const initTimer=setTimeout(()=>reject(new Error("无法初始化备份上传窗口")),10000);frame.onload=()=>{clearTimeout(initTimer);resolve()}});document.body.append(frame,form);await ready;',
         'frame.contentDocument.body.textContent',
         '上传等待超时，请检查路由器连接后重试',
@@ -80,6 +81,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: backup iframe load handler is registered after insertion")
     if page.count('id:"oc-backup-file"') != 1 or page.count('||"选择备份文件"') != 1:
         raise SystemExit("ERROR: backup file picker is duplicated or not custom-rendered")
+    if 'id:"oc-backup-file",type:"file",accept:".tar.gz,application/gzip",disabled:' in page:
+        raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
     if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
