@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'backupFile.value?.name||"选择备份文件"',
         'async function downloadBackup()',
         'backupType=g("backup")',
-        'backup_type="+encodeURIComponent(backupType.value)',
+        'backup_type:backupType.value',
         '导入 OpenClash 备份 (.tar / .tar.gz)',
         '备份范围',
         '生成备份',
@@ -82,13 +82,11 @@ with tempfile.TemporaryDirectory() as temporary:
         'value:"backup_only_rule"}',
         'value:"backup_only_proxy"}',
         'value:"backup_only_core"}',
-        'const form=new FormData();form.append("backup_file",file,file.name)',
-        'credentials:"same-origin",body:form',
-        'const response=await fetch("/cgi-bin/luci/admin/services/openclash/restore_backup"',
-        'const text=await response.text();let result;try{result=JSON.parse(text)}',
-        'if(!response.ok||result.status!=="success")',
+        'application/octet-stream',
+        'body:file.slice(offset,offset+1048576)',
+        'params.operation==="download"?"backup":"upload"',
         '导入 OpenClash 备份 (.tar / .tar.gz)',
-        '/cgi-bin/luci/admin/services/openclash/restore_backup',
+        '/cgi-bin/luci/higoros/openclash/',
     )
     required_backend = (
         'local allowfile = "/tmp/oc_restore.allow"',
@@ -112,6 +110,10 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: upload state disables the native file field before form submission")
     if "Backup archive exceeds 128 MiB limit" not in endpoint:
         raise SystemExit("ERROR: backup upload size limit was not installed")
+    if 'function action_higoros_upload()' not in endpoint or 'HTTP.content()' not in endpoint or 'current ~= offset' not in endpoint or 'higoros_upload_entry.sysauth = false' not in endpoint or 'entry({"higoros", "openclash", "upload"}' not in endpoint:
+        raise SystemExit("ERROR: raw chunked backup upload endpoint is incomplete")
+    if 'entry({"higoros", "openclash", "backup"}' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint:
+        raise SystemExit("ERROR: backup download endpoint is still behind the LuCI admin route")
     if 'pcall(fs.restore_backup, target_path)' not in endpoint or 'Backup restore error: ' not in endpoint:
         raise SystemExit("ERROR: restore exceptions are not converted to a JSON response")
     if 'oc_restore_entry.sysauth = false' not in endpoint or 'higoros_backup_entry.sysauth = false' not in endpoint or 'HTTP.getenv("HTTP_COOKIE")' not in endpoint or 'HigoOS session is invalid or expired' not in endpoint:

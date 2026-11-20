@@ -24,22 +24,23 @@ else:
 
 method_anchor = 'async function Je(){'
 method = (
+    'async function backupRequest(params,options={}){const path=params.operation==="download"?"backup":"upload";const response=await fetch("/cgi-bin/luci/higoros/openclash/"+path+"?"+new URLSearchParams(params),{credentials:"same-origin",...options});'
+    'if(!response.ok){const message=await response.text();throw new Error(message||"请求失败（HTTP "+response.status+")")}if(params.operation!=="download"){const result=await response.clone().json();if(result.status!=="success")throw new Error(result.message||"备份请求失败")}return response}\n'
     'async function downloadBackup(){if(t.value)return;t.value=!0;V.value="正在生成 OpenClash 备份";try{'
-    'const response=await fetch("/cgi-bin/luci/admin/services/openclash/higoros_backup?backup_type="+encodeURIComponent(backupType.value),{credentials:"same-origin"});'
-    'if(!response.ok){const message=await response.text();throw new Error(message||"备份生成失败（HTTP "+response.status+")")} '
+    'const response=await backupRequest({operation:"download",backup_type:backupType.value});'
     'const blob=await response.blob();if(!blob.size)throw new Error("备份文件为空");'
     'const match=(response.headers.get("Content-Disposition")||"").match(/filename="?([^";]+)"?/i);'
     'const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=match?match[1]:"OpenClash-backup.tar.gz";'
     'document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);V.value="备份已生成并下载"'
     '}catch(error){U(error)}finally{t.value=!1}}'
-    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value;'
-    't.value=!0;V.value="正在安全导入备份";try{'
-    'const form=new FormData();form.append("backup_file",file,file.name);'
-    'const response=await fetch("/cgi-bin/luci/admin/services/openclash/restore_backup",{method:"POST",credentials:"same-origin",body:form});'
-    'const text=await response.text();let result;try{result=JSON.parse(text)}catch{throw new Error("备份接口返回无法识别的响应（HTTP "+response.status+")")} '
-    'if(!response.ok||result.status!=="success")throw new Error(result.message||"备份导入失败（HTTP "+response.status+")");'
-    'backupFile.value=null;await N();V.value=result.message||"备份已导入，OpenClash 保持关闭"'
-    '}catch(error){U(error)}finally{t.value=!1}}'
+    'async function uploadBackup(){if(t.value||!backupFile.value)return;const file=backupFile.value,id=Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,"0")).join("");'
+    't.value=!0;V.value="正在安全导入备份";let started=!1;try{'
+    'await backupRequest({operation:"start",upload_id:id,filename:file.name},{method:"POST"});started=!0;'
+    'for(let offset=0;offset<file.size;offset+=1048576){V.value="正在上传备份 "+Math.min(100,Math.round((offset+1048576)/file.size*100))+"%";'
+    'await backupRequest({operation:"chunk",upload_id:id,filename:file.name,offset:String(offset)},{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file.slice(offset,offset+1048576)})}'
+    'const response=await backupRequest({operation:"finish",upload_id:id,filename:file.name},{method:"POST"});const result=await response.json();'
+    'if(result.status!=="success")throw new Error(result.message||"备份导入失败");started=!1;backupFile.value=null;await N();V.value=result.message||"备份已导入，OpenClash 保持关闭"'
+    '}catch(error){if(started)try{await backupRequest({operation:"cancel",upload_id:id,filename:file.name},{method:"POST"})}catch{}U(error)}finally{t.value=!1}}'
 )
 if "async function uploadBackup()" not in page and page.count(method_anchor) == 1:
     page = page.replace(method_anchor, method + method_anchor, 1)
@@ -67,7 +68,7 @@ if '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 
 elif '导入 OpenClash 备份 (.tar.gz)' not in page and '导入 OpenClash 备份 (.tar / .tar.gz)' not in page:
     raise SystemExit("ERROR: OpenClash files toolbar anchor changed")
 
-if '/cgi-bin/luci/admin/services/openclash/restore_backup' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page:
+if 'higoros/openclash/' not in page or 'application/octet-stream' not in page or 'backupFile.value' not in page or 'id:"oc-backup-file"' not in page:
     raise SystemExit("ERROR: HigoOS backup importer was not installed")
 pages[0].write_text(page, encoding="utf-8")
 
@@ -183,9 +184,7 @@ if session_anchor in controller_source and "local function higoros_session_valid
 elif "local function higoros_session_valid()" not in controller_source:
     raise SystemExit("ERROR: OpenClash HigoOS session validation anchor changed")
 backup_route_anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
-backup_route = (
-    'entry({"admin", "services", "openclash", "higoros_backup"}, call("action_higoros_backup"))'
-)
+backup_route = 'entry({"higoros", "openclash", "backup"}, call("action_higoros_backup"))'
 backup_route_auth = (
     'local higoros_backup_entry = ' + backup_route + '\n'
     'higoros_backup_entry.leaf = true\n'
@@ -205,7 +204,7 @@ function action_higoros_backup()
 		HTTP.write_json({ status = "error", message = "HigoOS session is invalid or expired; sign in again" })
 		return
 	end
-	local actions = {
+    local actions = {
 		backup = action_backup,
 		backup_ex_core = action_backup_ex_core,
 		backup_only_config = action_backup_only_config,
@@ -226,6 +225,73 @@ if backup_action_anchor in controller_source and "function action_higoros_backup
     controller_source = controller_source.replace(backup_action_anchor, "\n" + backup_action + backup_action_anchor, 1)
 elif "function action_higoros_backup()" not in controller_source:
     raise SystemExit("ERROR: OpenClash backup action insertion anchor changed")
+
+upload_action = r'''
+function action_higoros_upload()
+	local function respond(status, message)
+		HTTP.prepare_content("application/json")
+		HTTP.write_json({ status = status, message = message })
+	end
+	if not higoros_session_valid() then return respond("error", "HigoOS session is invalid or expired; sign in again") end
+	local operation = HTTP.formvalue("operation") or ""
+	local id = HTTP.formvalue("upload_id") or ""
+	local filename = (HTTP.formvalue("filename") or ""):lower()
+	if not id:match("^[a-f0-9]+$") or #id ~= 32 then return respond("error", "Invalid upload id") end
+	local suffix = filename:match("%.tar%.gz$") and ".tar.gz" or (filename:match("%.tar$") and ".tar" or nil)
+	if not suffix then return respond("error", "Backup must be a .tar or .tar.gz archive") end
+	local path = "/tmp/higoos_openclash_" .. id .. suffix
+	if operation == "start" then
+		local fp = io.open(path, "wb")
+		if not fp then return respond("error", "Unable to create temporary backup file") end
+		fp:close()
+		return respond("success", "Upload started")
+	elseif operation == "chunk" then
+		local chunk = HTTP.content() or ""
+		local offset = tonumber(HTTP.formvalue("offset") or "")
+		if #chunk == 0 or #chunk > 1048576 or not offset or offset < 0 then return respond("error", "Invalid backup upload chunk") end
+		local fp = io.open(path, "r+b")
+		if not fp then return respond("error", "Backup upload has expired; start again") end
+		local current = fp:seek("end") or 0
+		if current ~= offset or current + #chunk > 134217728 then fp:close(); return respond("error", "Backup upload offset or size is invalid") end
+		fp:write(chunk)
+		fp:close()
+		return respond("success", "Chunk received")
+	elseif operation == "cancel" then
+		fs.unlink(path)
+		return respond("success", "Upload cancelled")
+	elseif operation == "finish" then
+		local fp = io.open(path, "rb")
+		if not fp then return respond("error", "Backup upload file is missing") end
+		local size = fp:seek("end") or 0
+		fp:close()
+		if size == 0 then fs.unlink(path); return respond("error", "Backup file is empty") end
+		local ok, restored = pcall(fs.restore_backup, path)
+		fs.unlink(path)
+		if not ok then return respond("error", "Backup restore error: " .. tostring(restored):sub(1, 512)) end
+		if not restored then return respond("error", "Backup File Restore Failed") end
+		return respond("success", "Backup imported; OpenClash remains disabled")
+	end
+	return respond("error", "Unsupported upload operation")
+end
+'''
+upload_action_anchor = "\nfunction action_backup()"
+if "function action_higoros_upload()" not in controller_source and controller_source.count(upload_action_anchor) == 1:
+    controller_source = controller_source.replace(upload_action_anchor, "\n" + upload_action + upload_action_anchor, 1)
+elif "function action_higoros_upload()" not in controller_source:
+    raise SystemExit("ERROR: OpenClash upload action insertion anchor changed")
+
+upload_route = 'entry({"higoros", "openclash", "upload"}, call("action_higoros_upload"))'
+upload_route_auth = (
+    'local higoros_upload_entry = ' + upload_route + '\n'
+    'higoros_upload_entry.leaf = true\n'
+    'higoros_upload_entry.sysauth = false'
+)
+if 'higoros_upload_entry.sysauth = false' not in controller_source:
+    if controller_source.count(backup_route_anchor) == 1:
+        controller_source = controller_source.replace(backup_route_anchor, backup_route_anchor + "\n\t" + upload_route, 1)
+    if upload_route not in controller_source:
+        raise SystemExit("ERROR: OpenClash upload route anchor changed")
+    controller_source = controller_source.replace(upload_route, upload_route_auth, 1)
 route_anchor = 'entry({"admin", "services", "openclash", "restore_backup"}, call("action_restore_backup"))'
 route_replacement = (
     'local oc_restore_entry = ' + route_anchor + '\n'
