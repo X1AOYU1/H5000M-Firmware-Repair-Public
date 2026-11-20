@@ -57,9 +57,24 @@ jobs:
       - name: Test OpenClash card route
         run: python3 tests/openclash-entry-route.test.py
       - name: Build and verify firmware
+        id: firmware_build
         env:
           TZ: Asia/Shanghai
-        run: sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output
+        run: |
+          set -o pipefail
+          sudo bash scripts/build-public-node-free-wallpaper.sh input/full-repair-base.bin output 2>&1 | tee "$RUNNER_TEMP/firmware-build.log"
+      - name: Preserve firmware build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: H5000M-firmware-build-diagnostics-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/firmware-build.log
+            output/openclash-meta-core-link.txt
+            output/openclash-backup-import.txt
+            output/firmware-verification.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Dynamically click OpenClash app-center entry
         id: openclash_browser_audit
         env:
