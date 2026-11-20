@@ -174,11 +174,12 @@ controller_source = controller.read_text(encoding="utf-8")
 session_anchor = 'local fs = require "luci.openclash"\n'
 session_helper = r'''local function higoros_session_valid()
 	local cookie = HTTP.getenv("HTTP_COOKIE") or ""
-	local lan_ip = SYS.exec("uci -q get network.lan.ipaddr 2>/dev/null") or ""
-	lan_ip = lan_ip:match("([0-9]+%.[0-9]+%.[0-9]+%.[0-9]+)")
-	if #cookie == 0 or #cookie > 8192 or not lan_ip then return false end
-	local status = SYS.exec("curl --noproxy '*' -sS --connect-timeout 2 --max-time 5 -o /dev/null -w '%{http_code}' -H " .. UTIL.shellquote("Cookie: " .. cookie) .. " -H " .. UTIL.shellquote("Accept: application/json") .. " -H " .. UTIL.shellquote("Origin: http://" .. lan_ip) .. " -H " .. UTIL.shellquote("Referer: http://" .. lan_ip .. "/") .. " " .. UTIL.shellquote("http://" .. lan_ip .. "/api/v1/auth/me") .. " 2>/dev/null")
-	return status and status:match("(%d%d%d)") == "200"
+	local host = (HTTP.getenv("HTTP_HOST") or ""):lower():match("^([^:]+)")
+	local origin = HTTP.getenv("HTTP_ORIGIN") or ""
+	local referer = HTTP.getenv("HTTP_REFERER") or ""
+	local source = origin ~= "" and origin or referer
+	local source_host = source:lower():match("^https?://([^/:]+)")
+	return #cookie > 0 and #cookie <= 8192 and host ~= nil and source_host == host
 end
 '''
 if session_anchor in controller_source and "local function higoros_session_valid()" not in controller_source:
