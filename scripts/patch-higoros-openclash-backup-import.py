@@ -152,7 +152,7 @@ replacement = r'''function restore_backup(archive)
 	local tar_extract_options = gzip_archive and "-xzf " or "-xf "
 	local tarok = SYS.call("tar " .. tar_list_options .. quoted .. " >" .. listfile .. " 2>/dev/null") == 0
 	local has_profile, unsafe = false, false
-	local allowed, count = {}, 0
+	local allowed, profiles, count = {}, {}, 0
 	if tarok then
 		for line in io.lines(listfile) do
 			line = line:gsub("/$", "")
@@ -169,7 +169,10 @@ replacement = r'''function restore_backup(archive)
 				count = count + 1
 				if count > 2048 then unsafe = true; break end
 				allowed[#allowed + 1] = line
-				if category == "config" and name and name:match("%.ya?ml$") then has_profile = true end
+				if category == "config" and name and name:match("%.ya?ml$") then
+					has_profile = true
+					profiles[#profiles + 1] = name
+				end
 			end
 		end
 	end
@@ -211,6 +214,12 @@ replacement = r'''function restore_backup(archive)
 							ok = ok and SYS.call("cp -f " .. UTIL.shellquote(src) .. "/* " .. UTIL.shellquote(dest .. "/")) == 0
 						end
 					end
+					for index = 1, #profiles do
+						local suffix = "/" .. profiles[index]
+						ok = ok and SYS.call("test -s " .. UTIL.shellquote(config_dir .. suffix)
+							.. " && cmp -s " .. UTIL.shellquote(config_dir .. suffix)
+							.. " " .. UTIL.shellquote("/etc/openclash/config" .. suffix)) == 0
+					end
 					local route_files = {"china_ip_route.ipset", "china_ip6_route.ipset"}
 					for index = 1, #route_files do
 						local name = route_files[index]
@@ -240,7 +249,7 @@ replacement = r'''function restore_backup(archive)
 		failure = "备份包含不安全的路径或文件类型"
 	end
 	SYS.call("rm -rf " .. UTIL.shellquote(stage) .. " " .. UTIL.shellquote(listfile) .. " " .. UTIL.shellquote(allowfile))
-	return restored, failure
+	return restored, failure, restored and profiles or nil
 end
 '''
 lua.write_text(source[:start] + replacement + source[end:], encoding="utf-8")
@@ -410,6 +419,18 @@ if "function action_higoros_upload()" not in controller_source and controller_so
     controller_source = controller_source.replace(upload_action_anchor, "\n" + upload_action + upload_action_anchor, 1)
 elif "function action_higoros_upload()" not in controller_source:
     raise SystemExit("ERROR: OpenClash upload action insertion anchor changed")
+
+# The encrypted baseline already contains the first importer; update that handler in place too.
+old_result = 'local ok, restored, reason = pcall(fs.restore_backup, path)'
+old_success = 'return respond("success", "备份已导入，OpenClash 保持关闭")'
+new_success = ('local count = #profiles\n'
+               '\t\t\tlocal names = count <= 3 and "（" .. table.concat(profiles, "、") .. "）" or ""\n'
+               '\t\t\treturn respond("success", "已恢复 " .. count .. " 份配置" .. names .. "，OpenClash 保持关闭")')
+if controller_source.count(old_result) == 1 and controller_source.count(old_success) == 1:
+    controller_source = controller_source.replace(old_result, old_result.replace("reason", "reason, profiles"), 1)
+    controller_source = controller_source.replace(old_success, new_success, 1)
+elif new_success not in controller_source:
+    raise SystemExit("ERROR: OpenClash restore result hook changed")
 
 upload_route = 'entry({"higoros", "openclash", "upload"}, call("action_higoros_upload"))'
 upload_route_auth = (
