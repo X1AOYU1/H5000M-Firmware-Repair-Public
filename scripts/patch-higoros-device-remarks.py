@@ -27,7 +27,7 @@ def patch(root: Path) -> None:
 
     body = page.read_text(encoding="utf-8")
     vendor_setup = 'const h5000mDeviceVendor=createDeviceVendor({defineComponent:Z,h:Be,ref:M});'
-    vendor_card = 'r(h5000mDeviceVendor,{mac:t.macAddress},null,8,["mac"])'
+    vendor_card = 'r(h5000mDeviceVendor,{mac:t.macAddress,class:zs.class},null,8,["mac"])'
     if vendor_setup not in body:
         anchor = 'setup(l,{emit:g}){const h5000mDeviceRemark='
         if anchor not in body:

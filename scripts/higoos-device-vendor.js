@@ -12,6 +12,6 @@ export function createDeviceVendor({defineComponent, h, ref}) {
   });
   database.then(value => { vendors.value = value; }).catch(() => {});
   return defineComponent({name:'HigoosDeviceVendor', props:{mac:String}, setup(props) {
-    return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'text-sm text-txt-3 break-all'}, `厂商：${vendor}`) : null; };
+    return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'break-all'}, `厂商：${vendor}`) : null; };
   }});
 }
