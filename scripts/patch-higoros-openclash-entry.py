@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-"""Route the OpenClash app-center card to its HigoOS page."""
+"""Open the installed LuCI OpenClash page from the HigoOS app center."""
 from pathlib import Path
 import sys
+
+OPENCLASH = '[t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v||"").toLowerCase().includes("openclash"))'
+NATIVE = 't.kind==="native"?(s(),k(u,{key:0,'
+FALLBACK = 'to:t.entryRoute||{path:"/other",query:{tab:t.featureKey}}'
+OLD_MAPPING = f'to:({OPENCLASH}?{{path:"/apps/openclash"}}:t.entryRoute||{{path:"/other",query:{{tab:t.featureKey}}}})'
+LUCI = '(s(),r("a",{key:3,href:"/cgi-bin/luci/admin/services/openclash",class:ue(me)},"打开",2))'
+ENTRY = f'{OPENCLASH}?{LUCI}:'
 
 
 def patch(root: Path) -> str:
@@ -12,19 +19,14 @@ def patch(root: Path) -> str:
 
     page = pages[0]
     source = page.read_text(encoding="utf-8")
-    fallback = 'to:t.entryRoute||{path:"/other",query:{tab:t.featureKey}}'
-    mapping = 'to:([t.featureKey,t.name,t.displayName,t.entryRoute?.path].some(v=>String(v||"").toLowerCase().includes("openclash"))?{path:"/apps/openclash"}:t.entryRoute||{path:"/other",query:{tab:t.featureKey}})'
-
-    if mapping in source:
-        return "PASS: OpenClash app card already maps to /apps/openclash"
-    if source.count(fallback) != 1:
-        raise SystemExit(
-            "ERROR: expected one native app-card route fallback; "
-            f"found {source.count(fallback)}"
-        )
-
-    page.write_text(source.replace(fallback, mapping, 1), encoding="utf-8")
-    return "PASS: OpenClash app card now routes to /apps/openclash even when entryRoute is missing or stale"
+    if ENTRY + NATIVE + FALLBACK in source:
+        return "PASS: OpenClash app card already opens the standalone LuCI page"
+    candidates = [NATIVE + props for props in (FALLBACK, OLD_MAPPING)]
+    if sum(source.count(anchor) for anchor in candidates) != 1:
+        raise SystemExit("ERROR: expected one native app-card link")
+    anchor = next(anchor for anchor in candidates if anchor in source)
+    page.write_text(source.replace(anchor, ENTRY + NATIVE + FALLBACK, 1), encoding="utf-8")
+    return "PASS: OpenClash app card now opens the standalone LuCI page"
 
 
 if __name__ == "__main__":

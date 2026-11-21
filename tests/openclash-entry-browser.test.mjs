@@ -12,6 +12,8 @@ if (!root || !reportPath || !moduleRoot)
 
 const require = createRequire(join(moduleRoot, "__audit__.cjs"));
 const { chromium } = require("playwright");
+const luciPath = "/cgi-bin/luci/admin/services/openclash";
+const luciRequests = [];
 const apiRequests = [];
 const app = {
   name: "package-42",
@@ -34,6 +36,17 @@ const apiData = {
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === luciPath) {
+    luciRequests.push({
+      method: request.method,
+      mode: request.headers["sec-fetch-mode"],
+      destination: request.headers["sec-fetch-dest"],
+    });
+    // The firmware's LuCI CGI requires a running router. Simulate its login challenge.
+    response.writeHead(403, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><title>LuCI</title><main>LuCI sign-in fixture</main>");
+    return;
+  }
   if (url.pathname.startsWith("/api/v1/")) {
     apiRequests.push(`${request.method} ${url.pathname}`);
     const data = apiData[url.pathname] ?? {};
@@ -96,9 +109,18 @@ try {
   const openLink = page.getByRole("link", { name: "打开" });
   await openLink.waitFor({ state: "visible", timeout: 10_000 });
   const href = await openLink.getAttribute("href");
-  assert.equal(href, "/apps/openclash", `unexpected card link target: ${href}`);
+  assert.equal(href, luciPath, `unexpected card link target: ${href}`);
   await openLink.click();
-  await page.waitForURL("**/apps/openclash", { timeout: 10_000 });
+  await page.waitForURL(`**${luciPath}`, { timeout: 10_000 });
+  await page.getByText("LuCI sign-in fixture", { exact: true }).waitFor({ state: "visible" });
+  assert.deepEqual(luciRequests, [{ method: "GET", mode: "navigate", destination: "document" }]);
+  assert.equal(page.frames().length, 1, "LuCI must open as a standalone document");
+  const unexpected = pageErrors.filter(message => !message.includes("403"));
+  assert.deepEqual(unexpected, []);
+  pageErrors.length = 0;
+
+  // Retain the configuration-tab regression check for direct visits to the older URL.
+  await page.goto(`${baseUrl}/apps/openclash`, { waitUntil: "domcontentloaded" });
   await page.getByText("基本设置", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
   await page.getByText("配置文件", { exact: true }).click();
   const operation = page.locator("#oc-backup-file-type");
@@ -130,8 +152,8 @@ try {
 
   const report = [
     "PASS: HigoOS app-center OpenClash button was clicked in headless Chromium",
-    `PASS: card link target ${href}; router reached ${new URL(page.url()).pathname}`,
-    "PASS: OpenClash page rendered its native settings tab without browser errors",
+    `PASS: same-tab, top-level document navigation to ${href} (LuCI login response mocked)`,
+    "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,
   ].join("\n") + "\n";

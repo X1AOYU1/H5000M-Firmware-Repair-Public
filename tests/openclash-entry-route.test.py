@@ -3,7 +3,6 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import json
 
 
 repo = Path(__file__).resolve().parents[1]
@@ -14,38 +13,37 @@ with tempfile.TemporaryDirectory() as temporary:
     assets = root / "usr/share/higoros/web/assets"
     assets.mkdir(parents=True)
     asset = assets / "PluginsPage-fixture.js"
-    asset.write_text(
-        'const target={to:t.entryRoute||{path:"/other",query:{tab:t.featureKey}}};',
-        encoding="utf-8",
-    )
-
-    subprocess.run([sys.executable, str(patcher), str(root)], check=True)
-    subprocess.run([sys.executable, str(patcher), str(root)], check=True)
-    source = asset.read_text(encoding="utf-8")
     expression = (
         '[t.featureKey,t.name,t.displayName,t.entryRoute?.path]'
-        '.some(v=>String(v||"").toLowerCase().includes("openclash"))?'
-        '{path:"/apps/openclash"}:t.entryRoute||'
-        '{path:"/other",query:{tab:t.featureKey}}'
+        '.some(v=>String(v||"").toLowerCase().includes("openclash"))'
     )
-    expected = f"to:({expression})"
-    if expected not in source:
-        raise SystemExit("ERROR: OpenClash card route mapping was not emitted")
-
-    js = f"""
-      const routeFor = new Function('t', 'return (' + {json.dumps(expression)} + ')');
-      const cases = [
-        [{{featureKey:'openclash'}}, '/apps/openclash'],
-        [{{featureKey:'luci-app-openclash',entryRoute:{{path:'/wrong'}}}}, '/apps/openclash'],
-        [{{featureKey:'feature-42',name:'package-42',displayName:'OpenClash',entryRoute:{{path:'/wrong'}}}}, '/apps/openclash'],
-        [{{featureKey:'feature-42',name:'package-42',entryRoute:{{path:'/apps/openclash'}}}}, '/apps/openclash'],
-        [{{featureKey:'passwall'}}, '/other']
-      ];
-      for (const [app, expected] of cases) {{
-        const route = routeFor(app);
-        const actual = typeof route === 'string' ? route : route.path;
-        if (actual !== expected) throw new Error(`${{app.featureKey}} routed to ${{actual}}`);
-      }}
-      console.log('PASS: dynamic app-card route selection sends OpenClash to /apps/openclash and preserves other app fallback');
-    """
-    subprocess.run(["node", "-e", js], check=True)
+    fallback = 't.entryRoute||{path:"/other",query:{tab:t.featureKey}}'
+    for to in (fallback, f'({expression}?{{path:"/apps/openclash"}}:{fallback})'):
+        asset.write_text(
+            'const s=()=>{},r=(tag,props)=>[tag,props.href],ue=()=>"",me="",'
+            'u=null,k=(_,props)=>["router-link",props.to.path];'
+            f'const card=t=>t.kind==="native"?(s(),k(u,{{key:0,to:{to}}})):["legacy","existing"];',
+            encoding="utf-8",
+        )
+        subprocess.run([sys.executable, str(patcher), str(root)], check=True)
+        patched = asset.read_text(encoding="utf-8")
+        subprocess.run([sys.executable, str(patcher), str(root)], check=True)
+        assert asset.read_text(encoding="utf-8") == patched
+        subprocess.run(
+            ["node", "-e", patched + """
+                const expectedNative = ["a", "/cgi-bin/luci/admin/services/openclash"];
+                const cases = [
+                  [{kind:"native",featureKey:"openclash"}, expectedNative],
+                  [{kind:"native",name:"luci-app-openclash",entryRoute:{path:"/wrong"}}, expectedNative],
+                  [{kind:"legacy",displayName:"OpenClash"}, expectedNative],
+                  [{kind:"native",entryRoute:{path:"/apps/openclash"}}, expectedNative],
+                  [{kind:"native",featureKey:"other"}, ["router-link", "/other"]],
+                  [{kind:"native",entryRoute:{path:"/vpn"}}, ["router-link", "/vpn"]],
+                  [{kind:"legacy",name:"other"}, ["legacy", "existing"]]
+                ];
+                for (const [app, expected] of cases) {
+                  require("node:assert/strict").deepEqual(card(app), expected);
+                }
+            """],
+            check=True,
+        )
