@@ -7,9 +7,9 @@ export function findVendor(mac, vendors) {
 export function vendorBrand(vendor) {
   const name = (vendor || '').toUpperCase();
   const brands = [
-    [/HUAWEI|HONOR DEVICE/, 'HUAWEI'], [/SAMSUNG/, 'SAMSUNG'],
+    [/HONOR/, 'Honor'], [/HUAWEI/, 'HUAWEI'], [/SAMSUNG/, 'Samsung'],
     [/APPLE/, 'Apple'], [/XIAOMI|BEIJING XIAOMI/, 'Xiaomi'],
-    [/OPPO|ONEPLUS/, 'OPPO'], [/VIVO MOBILE|VIVO COMMUNICATION/, 'vivo'],
+    [/OPPO|ONEPLUS|REALME/, 'OPPO'], [/VIVO MOBILE|VIVO COMMUNICATION/, 'vivo'],
     [/LENOVO/, 'Lenovo'], [/ASUSTEK|ASUS/, 'ASUS'],
     [/DELL/, 'DELL'], [/HEWLETT.PACKARD|HP INC/, 'HP'],
     [/ELITEGROUP COMPUTER/, 'ECS'], [/MICROSOFT/, 'Microsoft'],
@@ -19,10 +19,14 @@ export function vendorBrand(vendor) {
 }
 export function brandFromDeviceName(name) {
   const value = (name || '').trim();
-  if (/\biphone\b|\bipad\b/i.test(value)) return 'Apple';
-  if (/\bsamsung\b|\bgalaxy\b|(?:^|[^a-z0-9])s(?:2[0-9]|1[0-9])(?:[-_ ]?(?:ultra|plus|fe|\+))?(?:$|[^a-z0-9])/i.test(value)) return 'Samsung';
-  if (/\bhuawei\b|\b(?:mate|pura)[-_ ]?\d+/i.test(value)) return 'Huawei';
-  if (/\bxiaomi\b|\bredmi\b/i.test(value)) return 'Xiaomi';
+  if (/\b(?:iphone|ipad|macbook|imac|airpods|apple[ -]?tv)\b/i.test(value)) return 'Apple';
+  if (/\b(?:samsung|galaxy|sm[-_ ]?[a-z0-9]+|gt[-_ ]?[a-z0-9]+)\b|(?:^|[^a-z0-9])s(?:2[0-9]|1[0-9])(?:[-_ ]?(?:ultra|plus|fe|\+))?(?:$|[^a-z0-9])/i.test(value)) return 'Samsung';
+  if (/\b(?:huawei|mate|pura|nova)[-_ ]?\d*/i.test(value)) return 'Huawei';
+  if (/\b(?:honor|荣耀|magic|x系列)[-_ ]?\d*/i.test(value)) return 'Honor';
+  if (/\b(?:xiaomi|redmi|poco|mi)[-_ ]?[a-z0-9]*\b/i.test(value)) return 'Xiaomi';
+  if (/\b(?:oppo|oneplus|realme|一加)[-_ ]?[a-z0-9]*\b/i.test(value)) return 'OPPO';
+  if (/\b(?:vivo|iqoo)[-_ ]?[a-z0-9]*\b/i.test(value)) return 'vivo';
+  if (/\b(?:pixel|google)[-_ ]?[a-z0-9]*\b/i.test(value)) return 'Google';
   return '';
 }
 export function createDeviceVendor({defineComponent, h, ref}) {
