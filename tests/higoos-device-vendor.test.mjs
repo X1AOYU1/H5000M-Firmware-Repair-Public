@@ -54,3 +54,10 @@ render().text[0].attrs.onClick();
 await render().text[1].text[1].text[0].attrs.onClick();
 assert.equal(render().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: select, save, display and reset a device avatar');
+
+render().text[0].attrs.onClick();
+await render().text[1].text[1].text[12].attrs.onClick();
+assert.equal(saved.c6ac9ff69422, 'Computer');
+assert.equal(render().text[0].text[0].text[0].attrs.src, '/assets/device-logos/computer.svg');
+assert.match(await readFile('scripts/device-logos/huawei.svg', 'utf8'), /fill="#E60012"/);
+console.log('PASS: computer selection displays an icon and Huawei logo is colored');

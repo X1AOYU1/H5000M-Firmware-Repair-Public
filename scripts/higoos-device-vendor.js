@@ -37,7 +37,7 @@ export function createDeviceVendor({defineComponent, h, ref}) {
   }});
 }
 export function brandLogo(brand) {
-  const logos = {apple:'apple', samsung:'samsung', huawei:'huawei', xiaomi:'xiaomi', oppo:'oppo', vivo:'vivo', honor:'honor', lenovo:'lenovo', asus:'asus', dell:'dell', hp:'hp', google:'google', 'tp-link':'tplink'};
+  const logos = {apple:'apple', samsung:'samsung', huawei:'huawei', xiaomi:'xiaomi', oppo:'oppo', vivo:'vivo', honor:'honor', lenovo:'lenovo', asus:'asus', dell:'dell', hp:'hp', google:'google', 'tp-link':'tplink', computer:'computer', phone:'phone', tablet:'tablet', tv:'tv'};
   const slug = logos[(brand || '').toLowerCase()];
   return slug ? `/assets/device-logos/${slug}.svg` : '';
 }
@@ -73,8 +73,8 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
     return () => {
       const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value))) || brandFromDeviceName(props.name);
       const logo = brandLogo(brand);
-      const image = logo ? h('span', {title:brand,style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',background:'rgba(0,123,196,.08)'}}, [h('img',{src:logo,alt:brand,style:{width:'80%',height:'80%',objectFit:'contain'}})]) : brand
-        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',fontSize:brand.length > 7 ? '12px' : brand.length > 4 ? '14px' : '17px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
+      const image = logo ? h('span', {title:brand,style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',background:'transparent'}}, [h('img',{src:logo,alt:brand,style:{width:'80%',height:'80%',objectFit:'contain'}})]) : brand
+        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',fontSize:brand.length > 7 ? '12px' : brand.length > 4 ? '14px' : '17px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'transparent',overflow:'hidden'}}, brand)
         : h('img', {src:props.fallback, alt:'', class:'w-9 h-9 object-contain'});
       return h('div', {style:{position:'relative'}}, [
         h('button', {type:'button', title:'选择设备头像', 'aria-label':'选择设备头像', onClick:()=>{show.value=!show.value;error.value='';}}, [image]),

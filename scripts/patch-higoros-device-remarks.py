@@ -60,7 +60,7 @@ def patch(root: Path) -> None:
 
     body = page.read_text(encoding="utf-8")
     avatar_box = 'Ps={class:"w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-bg-1/60 border border-line-1/70"}'
-    avatar_box_large = avatar_box.replace('w-12 h-12', 'w-14 h-14')
+    avatar_box_large = avatar_box.replace('w-12 h-12', 'w-14 h-14').replace(' bg-bg-1/60', '')
     if avatar_box_large not in body:
         if body.count(avatar_box) != 1:
             raise SystemExit("ERROR: device avatar box anchor changed")
