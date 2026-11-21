@@ -22,8 +22,6 @@ export function mountHigoosWallpaperCrop({upload}) {
     const xPosition = dialog.querySelector('[data-control="x"]');
     const yPosition = dialog.querySelector('[data-control="y"]');
     const status = dialog.querySelector(".higoos-crop-status");
-    const sourceUrl = file ? URL.createObjectURL(file) : prefix + encodeURIComponent(name) + "?v=" + Date.now();
-    image.src = sourceUrl;
     let loaded = false;
     let dx = 0;
     let dy = 0;
@@ -45,6 +43,16 @@ export function mountHigoosWallpaperCrop({upload}) {
       image.style.top = `${-dy}px`;
     };
     image.onload = () => { loaded = true; layout(); };
+    image.onerror = () => { status.textContent = "图片无法加载，请选择有效的 JPEG、PNG 或 WebP 图片。"; };
+    // HigoOS permits data: images but blocks blob: images in its CSP.
+    const reader = file ? new FileReader() : null;
+    if (reader) {
+      reader.onload = () => { if (typeof reader.result === "string") image.src = reader.result; };
+      reader.onerror = () => { status.textContent = "无法读取图片，请重新选择文件。"; };
+      reader.readAsDataURL(file);
+    } else {
+      image.src = prefix + encodeURIComponent(name) + "?v=" + Date.now();
+    }
     [zoom, xPosition, yPosition].forEach(input => input.addEventListener("input", layout));
     preview.addEventListener("pointerdown", event => { pointer = {id:event.pointerId,x:event.clientX,y:event.clientY,dx,dy}; preview.setPointerCapture(event.pointerId); });
     preview.addEventListener("pointermove", event => {
@@ -58,7 +66,7 @@ export function mountHigoosWallpaperCrop({upload}) {
     preview.addEventListener("pointerup", () => { pointer = null; });
     preview.addEventListener("pointercancel", () => { pointer = null; });
     let finished = false;
-    const close = (result = null) => { if (finished) return; finished = true; if (file) URL.revokeObjectURL(sourceUrl); shade.remove(); resolve(result); };
+    const close = (result = null) => { if (finished) return; finished = true; if (reader && reader.readyState === FileReader.LOADING) reader.abort(); shade.remove(); resolve(result); };
     dialog.querySelector('[data-action="cancel"]').addEventListener("click", () => close());
     shade.addEventListener("click", event => { if (event.target === shade) close(); });
     dialog.querySelector('[data-action="save"]').addEventListener("click", async event => {

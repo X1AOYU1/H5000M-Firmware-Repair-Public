@@ -48,6 +48,10 @@ jobs:
         run: python3 tests/higoros-login-wallpaper-patch.test.py
       - name: Check wallpaper crop module syntax
         run: node --input-type=module --check < scripts/higoos-wallpaper-crop.js
+      - name: Test crop preview under HigoOS CSP
+        env:
+          PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+        run: node tests/higoos-wallpaper-crop-browser.test.mjs
       - name: Test OpenClash node cleanup
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
