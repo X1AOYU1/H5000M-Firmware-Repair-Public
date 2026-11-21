@@ -33,7 +33,7 @@ local ubus = require "ubus"
 local uloop = require "uloop"
 uloop.init()
 local conn = assert(ubus.connect())
-conn:add({ ["network.interface.lan"] = { status = { function(req, msg)
+conn:add({ ["network.interface"] = { dump = { function(req, msg) conn:reply(req, {interface={{interface="lan",up=true,device="auditlan0",l3_device="auditlan0",proto="static",["ipv4-address"]={{address="192.0.2.1",mask=24}}}}}) end, {} } }, ["network.interface.lan"] = { status = { function(req, msg)
   conn:reply(req, { up=true, pending=false, available=true, device="auditlan0", l3_device="auditlan0", proto="static", ["ipv4-address"]={{address="192.0.2.1",mask=24}} })
 end, {} } } })
 uloop.run()
@@ -53,7 +53,7 @@ for name, service in zip(['/sbin/ubusd', '/sbin/rpcd', '/usr/bin/lua'], services
         print('service exited:', name, service.returncode)
 for args in [['list'], ['call', 'network.interface.lan', 'status']]:
     try:
-        result = subprocess.run(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/bin/ubus'] + args, env=env, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/bin/ubus-real'] + args, env=env, capture_output=True, text=True, timeout=15)
         print('ubus diagnostic:', args, result.returncode, result.stdout[:2000], result.stderr[:1000])
     except subprocess.TimeoutExpired:
         print('ubus diagnostic timed out:', args)
