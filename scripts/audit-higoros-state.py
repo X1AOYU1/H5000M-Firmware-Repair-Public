@@ -5,6 +5,8 @@ root = pathlib.Path(sys.argv[1]).resolve()
 state = root / "tmp/higoros-audit-state"
 runtime = root / "tmp/higoros-audit-runtime"
 (root / 'tmp/sysinfo').mkdir(parents=True, exist_ok=True)
+(root / 'etc/config').mkdir(parents=True, exist_ok=True)
+(root / 'etc/config/network').write_text("config interface 'lan'\n	option device 'lo'\n	option proto 'static'\n	option ipaddr '127.0.0.1'\n	option netmask '255.0.0.0'\n")
 (root / 'tmp/sysinfo/board_name').write_text('hiveton,h5000m\n')
 state.mkdir(parents=True, exist_ok=True)
 runtime.mkdir(parents=True, exist_ok=True)
@@ -12,7 +14,7 @@ shutil.copy2('/usr/bin/qemu-aarch64-static', root / 'usr/bin/qemu-aarch64-static
 (root / 'tmp/higoros-audit-state/devices-state.json').write_text('{}')
 password_hash = subprocess.check_output(['openssl', 'passwd', '-6', 'synthetic-audit-only'], text=True).strip()
 (root / 'etc/shadow').write_text('root:' + password_hash + ':19000:0:99999:7:::\n')
-env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='debug', QEMU_STRACE='1')
+env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='debug')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
 (root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
 (root / 'dev').mkdir(exist_ok=True)
@@ -47,12 +49,12 @@ try:
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     login = urllib.request.Request('http://127.0.0.1:18080/api/v1/auth/login', data=json.dumps({'username':'root','password':'synthetic-audit-only'}).encode(), headers={'Content-Type':'application/json'}, method='POST')
     try:
-        with opener.open(login, timeout=5) as response: print('synthetic login:', response.status); response.read()
+        with opener.open(login, timeout=30) as response: print('synthetic login:', response.status); response.read()
     except urllib.error.HTTPError as e: print('synthetic login failed:', e.code, e.read(1000).decode('utf-8', 'replace')); sys.exit(1)
     for method, path in [('GET','/api/v1/devices'), ('DELETE','/api/v1/devices/00:11:22:33:44:55')]:
         req=urllib.request.Request('http://127.0.0.1:18080'+path, method=method)
         try:
-            with opener.open(req,timeout=3) as response: print(method, path, response.status, response.read(1500).decode('utf-8','replace'))
+            with opener.open(req,timeout=30) as response: print(method, path, response.status, response.read(1500).decode('utf-8','replace'))
         except urllib.error.HTTPError as e: print(method, path, e.code, e.read(1500).decode('utf-8','replace'))
     time.sleep(10)
     for p in sorted(state.iterdir()):
