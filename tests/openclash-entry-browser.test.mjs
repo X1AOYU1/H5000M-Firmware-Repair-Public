@@ -49,7 +49,7 @@ const statusMarkup = nativeTemplate
   .replace('id="config-file-empty-state" class="config-file-empty-state oc-hidden"', 'id="config-file-empty-state" class="config-file-empty-state"');
 const configMarkup = renderLuaFixture(uploadTemplate.replace(/^<script src=.*<\/script>$/gm, ""));
 const apiRequests = [];
-const remarkEndpoint = "/cgi-bin/luci/admin/system/higoos-device-remarks";
+const remarkEndpoint = luciPath + "/device_remarks";
 const devices = [
   { id: "router-audit-phone", name: "测试手机", macAddress: "02:00:00:00:00:01",
     ipAddress: "10.0.0.201", osType: "android", deviceType: "mobile", isOnline: true, trafficAvailable: false },
@@ -93,15 +93,15 @@ const server = createServer(async (request, response) => {
     response.writeHead(200, { "content-type": "application/json" });
     return response.end(JSON.stringify({ status: "queued", kind }));
   }
-  if (url.pathname === remarkEndpoint || url.pathname === remarkEndpoint + "/save") {
+  if (url.pathname === remarkEndpoint) {
     if (!cookie.includes("sysauth_http=audit")) return response.writeHead(403).end();
     const send = (data) => response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(data));
-    if (url.pathname === remarkEndpoint && request.method === "GET") return send({ remarks, token });
-    if (url.pathname !== remarkEndpoint + "/save" || request.method !== "POST") return response.writeHead(405).end();
+    if (request.method === "GET") return send({ remarks, token });
+    if (request.method !== "POST") return response.writeHead(405).end();
     const parts = [];
     for await (const part of request) parts.push(part);
     const form = new URLSearchParams(Buffer.concat(parts).toString());
-    if (form.get("token") !== token) return response.writeHead(403).end();
+    if (form.get("token") !== token) return response.writeHead(403, { "content-type": "application/json" }).end(JSON.stringify({ error: "CSRF token invalid" }));
     const mac = form.get("mac"), note = form.get("note");
     remarkWrites.push({ mac, note });
     if (note) remarks[mac] = note;
@@ -424,7 +424,7 @@ try {
     "PASS: native OpenClash cards use two columns on desktop and one on mobile without external CSS",
     "PASS: native OpenClash overview restores .tar.gz and configuration page sends a 31 MiB .tar intact in authenticated chunks; upload errors stay inside the page",
     "PASS: PassWall opens and navigates its native LuCI fixture inside HigoOS using the same LuCI session",
-    "PASS: device remarks save and reload independently of device name through the authenticated API fixture, then clear",
+    "PASS: device-management remarks save and reload independently of device name through the OpenClash LuCI route, then clear",
     "PASS: GEO and China route update buttons submitted only their own target, with no settings reload",
     "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",

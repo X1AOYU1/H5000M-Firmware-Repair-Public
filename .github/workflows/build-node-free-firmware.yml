@@ -83,7 +83,7 @@ jobs:
           retention-days: 7
       - name: Restore both profiles with the packed ARM64 BusyBox
         run: sudo python3 tests/openclash-firmware-restore.test.py output/final-root
-      - name: Test device remarks with the packed ARM64 ucode
+      - name: Test authenticated device remarks through LuCI
         run: sudo python3 tests/higoos-device-remarks.test.py output/final-root
       - name: Dynamically click OpenClash app-center entry
         id: openclash_browser_audit

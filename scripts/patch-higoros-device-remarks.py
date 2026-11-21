@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Install device remarks and mount their control in the HigoOS device cards."""
-import json
 from pathlib import Path
 import sys
 
@@ -26,16 +25,23 @@ def patch(root: Path) -> None:
     elif not all(body.count(new) == 1 for _, new in edits):
         raise SystemExit("ERROR: HigoOS device card anchors changed")
 
-    module = "luci.controller.higoos_device_remarks"
-    base = "admin/system/higoos-device-remarks"
-    routes = {
-        base: {"action": {"type": "function", "module": module, "function": "list"}},
-        base + "/save": {"action": {"type": "function", "module": module, "function": "save", "post": True}},
-    }
+    controller = root / "usr/lib/lua/luci/controller/openclash.lua"
+    controller_source = controller.read_text(encoding="utf-8")
+    route_anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
+    route = 'entry({"admin", "services", "openclash", "device_remarks"}, call("action_higoros_device_remarks"))'
+    handler_anchor = "\nfunction action_backup()"
+    handler_path = sources / "luci-device-remarks.lua"
+    handler = handler_path.read_text(encoding="utf-8")
+    if route not in controller_source:
+        if controller_source.count(route_anchor) != 1 or controller_source.count(handler_anchor) != 1:
+            raise SystemExit("ERROR: OpenClash controller cannot host the device remarks API")
+        controller_source = controller_source.replace(route_anchor, route + "\n\t" + route_anchor, 1)
+        controller_source = controller_source.replace(handler_anchor, "\n" + handler + handler_anchor, 1)
+        controller.write_text(controller_source, encoding="utf-8")
+    elif "function action_higoros_device_remarks()" not in controller_source:
+        raise SystemExit("ERROR: device remarks route has no handler")
     files = {
         assets / "higoos-device-remarks.js": (sources / "higoos-device-remarks.js").read_text(encoding="utf-8"),
-        root / "usr/share/ucode/luci/controller/higoos_device_remarks.uc": (sources / "higoos-device-remarks.uc").read_text(encoding="utf-8"),
-        root / "usr/share/luci/menu.d/higoos-device-remarks.json": json.dumps(routes, indent=2) + "\n",
         root / "lib/upgrade/keep.d/higoos-device-remarks": "/etc/higoos-device-remarks/\n",
     }
     for path, contents in files.items():

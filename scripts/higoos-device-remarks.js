@@ -1,4 +1,4 @@
-const endpoint = "/cgi-bin/luci/admin/system/higoos-device-remarks";
+const endpoint = "/cgi-bin/luci/admin/services/openclash/device_remarks";
 
 async function request(path, options) {
   const response = await fetch(endpoint + path, {
@@ -6,9 +6,10 @@ async function request(path, options) {
   });
   if (response.redirected || [401, 403].includes(response.status) || response.headers.has("x-luci-login-required"))
     throw new Error("请退出后台并重新登录后再试");
-  if (!response.ok || !response.headers.get("content-type")?.includes("application/json"))
-    throw new Error("设备备注暂时无法读取或保存，请重试");
-  return response.json();
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data)
+    throw new Error(data?.error || `备注保存失败（HTTP ${response.status}），请重试`);
+  return data;
 }
 
 export function createDeviceRemark({ defineComponent, h, ref, Modal, Button, Input }) {
@@ -58,7 +59,7 @@ export function createDeviceRemark({ defineComponent, h, ref, Modal, Button, Inp
         const mac = key(), note = draft.value.trim();
         try {
           const token = await load();
-          const result = await request("/save", {
+          const result = await request("", {
             method: "POST", body: new URLSearchParams({ token, mac, note }),
           });
           notes.value = { ...notes.value, [mac]: result.note };

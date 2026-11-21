@@ -53,7 +53,7 @@ package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
-    "login card translucency preserves contrast": 'card.style.setProperty("background-color","rgba(255,255,255,.84)"' in login and 'input[type="password"]' in login and 'new MutationObserver(q)' in login,
+    "wallpaper login card becomes fully transparent only when a wallpaper is active": 'if(!wallpaper.value)return;' in login and 'card.style.setProperty("background-color","transparent","important")' in login and 'input[type="password"]' in login and 'new MutationObserver(q)' in login,
     "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
@@ -65,7 +65,7 @@ checks = {
     "Meta core canonical executable link repaired": all(value in openclash_subscribe for value in ('ensure_meta_core_compat_link()', 'ensure_meta_core_compat_link || {', '/etc/openclash/core/clash_meta', '/tmp/etc/openclash/core/clash_meta')) and 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in openclash_core_update,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
-    "device remarks": "createDeviceRemark" in devices and (root / "usr/share/luci/menu.d/higoos-device-remarks.json").is_file(),
+    "device remarks": "createDeviceRemark" in devices and 'device_remarks"}, call("action_higoros_device_remarks")' in openclash_controller and "luci-device-remarks" not in openclash_controller,
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
     "package market UI": package is not None,
 }

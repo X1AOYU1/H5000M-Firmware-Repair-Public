@@ -29,14 +29,20 @@ login_probe = (
     'if(w&&w.startsWith("/luci-static/argon/background/"))p.push(w)}catch{}'
     'p.push(...["webp","png","jpg","jpeg","gif"].map(e=>"/luci-static/argon/background/higoos-login-wallpaper."+e));'
     'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>wallpaper.value=w+"?v="+Date.now();'
-    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo;const q=()=>{if(!wallpaper.value)return;'
+    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo,activeCard,originalStyles;const q=()=>{'
+    'if(!wallpaper.value){if(activeCard&&originalStyles)for(const [key,[value,priority]] of Object.entries(originalStyles)){'
+    'if(value)activeCard.style.setProperty(key,value,priority);else activeCard.style.removeProperty(key)}'
+    'activeCard=null;originalStyles=null;return}if(activeCard)return;'
     'const input=document.querySelector(\'input[type="password"]\');for(let card=input?.parentElement;card&&card!==document.body;card=card.parentElement){'
     'const box=card.getBoundingClientRect(),style=getComputedStyle(card),color=/rgba?\\(([^)]+)\\)/.exec(style.backgroundColor),parts=color?.[1].split(",").map(Number),'
     'white=parts&&parts.slice(0,3).every(value=>value>245)&&(parts[3]??1)>.95;'
-    'if(box.width>=320&&box.height>=250&&style.borderRadius!=="0px"&&white){'
-    'card.style.setProperty("background-color","rgba(255,255,255,.84)","important");'
-    'card.style.setProperty("backdrop-filter","blur(12px)");card.style.setProperty("-webkit-backdrop-filter","blur(12px)");'
-    'card.style.setProperty("border","1px solid rgba(255,255,255,.5)");mo?.disconnect();break}}};q();'
+    'if(box.width>=320&&box.height>=250&&style.borderRadius!=="0px"&&white){activeCard=card;'
+    'originalStyles=Object.fromEntries(["background-color","backdrop-filter","-webkit-backdrop-filter","border-color","box-shadow"]'
+    '.map(key=>[key,[card.style.getPropertyValue(key),card.style.getPropertyPriority(key)]]));'
+    'card.style.setProperty("background-color","transparent","important");'
+    'card.style.setProperty("backdrop-filter","none","important");card.style.setProperty("-webkit-backdrop-filter","none","important");'
+    'card.style.setProperty("border-color","transparent","important");'
+    'card.style.setProperty("box-shadow","none","important");break}}};q();'
     'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true})})()'
 )
 mounted_replacement = (
@@ -48,7 +54,7 @@ if login.count(mounted_anchor) == 1:
 elif login_probe in login:
     pass
 elif 'localStorage.getItem("higoos_argon_login_wallpaper")' in login:
-    mounted_start = login.index('(()=>{try{const w=localStorage.getItem("higoos_argon_login_wallpaper")')
+    mounted_start = login.index('(()=>{const p=[];try{const w=localStorage.getItem("higoos_argon_login_wallpaper")')
     mounted_end = login.index('})(),H()', mounted_start) + len('})(),H()')
     login = login[:mounted_start] + login_probe + ',H()' + login[mounted_end:]
 else:
@@ -187,7 +193,8 @@ native_path.write_text(native, encoding="utf-8")
 
 for marker, content in (
     ("new Image()", login),
-    ('card.style.setProperty("background-color","rgba(255,255,255,.84)"', login),
+    ('card.style.setProperty("background-color","transparent","important")', login),
+    ("if(activeCard&&originalStyles)", login),
     ("higoos-login-wallpaper.", login),
     ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),
