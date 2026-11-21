@@ -7,6 +7,7 @@ runtime = root / "tmp/higoros-audit-runtime"
 (root / 'tmp/sysinfo').mkdir(parents=True, exist_ok=True)
 (root / 'etc/config').mkdir(parents=True, exist_ok=True)
 (root / 'etc/config/network').write_text("config interface 'lan'\n	option device 'auditlan0'\n	option proto 'static'\n	option ipaddr '192.0.2.1'\n	option netmask '255.255.255.0'\n")
+(root / 'etc/config/wireless').write_text('')
 (root / 'tmp/sysinfo/board_name').write_text('hiveton,h5000m\n')
 state.mkdir(parents=True, exist_ok=True)
 runtime.mkdir(parents=True, exist_ok=True)
@@ -40,6 +41,10 @@ for args in [['list'], ['call', 'network.interface.lan', 'status']]:
         print('ubus diagnostic:', args, result.returncode, result.stdout[:2000], result.stderr[:1000])
     except subprocess.TimeoutExpired:
         print('ubus diagnostic timed out:', args)
+        result = subprocess.run(['ps', '-eo', 'pid,ppid,state,wchan:24,args'], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            if any(term in line for term in ('qemu-aarch64', 'netifd', 'wireless', 'mac80211', 'audit-higoros')):
+                print('process diagnostic:', line[:300])
 daemon_log = open(root / 'tmp/higoros-audit-daemon.log', 'w+')
 proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=daemon_log)
 try:
