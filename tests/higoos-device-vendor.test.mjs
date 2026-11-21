@@ -12,3 +12,14 @@ assert.equal(findVendor("invalid", fixture), "");
 const vendors = JSON.parse(await readFile("scripts/higoos-ieee-vendors.json", "utf8"));
 assert.ok(Object.keys(vendors).length > 50000);
 console.log("PASS: longest IEEE prefix and randomized MAC filtering");
+
+let requested = '';
+globalThis.fetch = async url => { requested = url; return {ok:true, json: async () => ({'E00630':'HUAWEI TECHNOLOGIES CO.,LTD'})}; };
+const { createDeviceVendor } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const component = createDeviceVendor({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, text}), ref:value=>({value})});
+await new Promise(resolve=>setTimeout(resolve, 0));
+const renderOffline = component.setup({mac:'E0:06:30:12:34:56', online:false});
+assert.equal(requested, '/assets/higoos-ieee-vendors.json');
+assert.match(renderOffline().text, /HUAWEI/);
+assert.equal(component.setup({mac:'02:11:22:33:44:55', online:false})(), null);
+console.log('PASS: offline device vendor renders with database; randomized MAC is not misidentified');
