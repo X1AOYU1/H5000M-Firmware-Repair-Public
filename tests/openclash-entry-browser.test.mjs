@@ -14,6 +14,13 @@ const require = createRequire(join(moduleRoot, "__audit__.cjs"));
 const { chromium } = require("playwright");
 const luciPath = "/cgi-bin/luci/admin/services/openclash";
 const luciRequests = [];
+const signins = [];
+const fixturePassword = "browser-audit-password";
+const nativeTemplate = await readFile(resolve(root, "../../../lib/lua/luci/view/openclash/status.htm"), "utf8");
+const statusMarkup = nativeTemplate
+  .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+  .replace(/<%:([\s\S]*?)%>/g, "$1")
+  .replace(/<%[\s\S]*?%>/g, "");
 const apiRequests = [];
 const app = {
   name: "package-42",
@@ -36,19 +43,68 @@ const apiData = {
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  const cookie = request.headers.cookie ?? "";
+  if (url.pathname === "/cgi-bin/luci/admin" && request.method === "POST") {
+    const parts = [];
+    for await (const part of request) parts.push(part);
+    const form = new URLSearchParams(Buffer.concat(parts).toString());
+    if (!cookie.includes("higoros_session=audit") ||
+        form.get("luci_username") !== "root" || form.get("luci_password") !== fixturePassword) {
+      response.writeHead(403).end();
+      return;
+    }
+    signins.push("luci");
+    response.writeHead(302, {
+      location: "/cgi-bin/luci/admin/status/overview",
+      "set-cookie": "sysauth_http=audit; Path=/cgi-bin/luci; HttpOnly; SameSite=Strict",
+    }).end();
+    return;
+  }
   if (url.pathname === luciPath) {
     luciRequests.push({
       method: request.method,
       mode: request.headers["sec-fetch-mode"],
       destination: request.headers["sec-fetch-dest"],
     });
-    // The firmware's LuCI CGI requires a running router. Simulate its login challenge.
-    response.writeHead(403, { "content-type": "text/html; charset=utf-8" });
-    response.end("<!doctype html><title>LuCI</title><main>LuCI sign-in fixture</main>");
+    if (!cookie.includes("sysauth_http=audit")) {
+      response.writeHead(403, { "content-type": "text/html; charset=utf-8" });
+      response.end("<!doctype html><title>LuCI</title><main>LuCI sign-in fixture</main>");
+      return;
+    }
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
+      "<title>OpenClash</title><body class=logged-in><aside id=mainmenu>LuCI navigation</aside>" + statusMarkup);
+    return;
+  }
+  if (url.pathname.startsWith("/luci-static/")) {
+    response.writeHead(404).end();
     return;
   }
   if (url.pathname.startsWith("/api/v1/")) {
     apiRequests.push(`${request.method} ${url.pathname}`);
+    if (url.pathname === "/api/v1/auth/login" && request.method === "POST") {
+      const parts = [];
+      for await (const part of request) parts.push(part);
+      let form;
+      try { form = JSON.parse(Buffer.concat(parts).toString()); } catch {}
+      if (form?.username !== "root" || form?.password !== fixturePassword) {
+        response.writeHead(401, { "content-type": "application/json" });
+        response.end(JSON.stringify({ code: 401, message: "invalid credentials" }));
+        return;
+      }
+      signins.push("higoros");
+      response.writeHead(200, {
+        "content-type": "application/json",
+        "set-cookie": "higoros_session=audit; Path=/; HttpOnly; SameSite=Strict",
+      });
+      response.end(JSON.stringify({ code: 0, data: {} }));
+      return;
+    }
+    if (url.pathname === "/api/v1/auth/me" && !cookie.includes("higoros_session=audit")) {
+      response.writeHead(401, { "content-type": "application/json" });
+      response.end(JSON.stringify({ code: 401, message: "unauthorized" }));
+      return;
+    }
     const data = apiData[url.pathname] ?? {};
     response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ code: 0, data }));
@@ -105,17 +161,45 @@ try {
   page.on("console", (message) => {
     if (message.type() === "error") pageErrors.push(message.text());
   });
-  await page.goto(`${baseUrl}/plugins`, { waitUntil: "domcontentloaded" });
+  await page.goto(baseUrl + "/login", { waitUntil: "domcontentloaded" });
+  await page.locator('[autocomplete="username"]').fill("root");
+  await page.locator('[autocomplete="current-password"]').fill(fixturePassword);
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.waitForURL(url => !url.pathname.startsWith("/login"), { timeout: 12_000 });
+  assert.deepEqual(signins, ["higoros", "luci"], "LuCI sign-in must follow successful HigoOS sign-in");
+  pageErrors.length = 0;
+  await page.goto(baseUrl + "/plugins", { waitUntil: "domcontentloaded" });
   const openLink = page.getByRole("link", { name: "打开" });
   await openLink.waitFor({ state: "visible", timeout: 10_000 });
   const href = await openLink.getAttribute("href");
-  assert.equal(href, luciPath, `unexpected card link target: ${href}`);
+  assert.equal(href, "/apps/openclash-luci");
   await openLink.click();
-  await page.waitForURL(`**${luciPath}`, { timeout: 10_000 });
-  await page.getByText("LuCI sign-in fixture", { exact: true }).waitFor({ state: "visible" });
-  assert.deepEqual(luciRequests, [{ method: "GET", mode: "navigate", destination: "document" }]);
-  assert.equal(page.frames().length, 1, "LuCI must open as a standalone document");
-  const unexpected = pageErrors.filter(message => !message.includes("403"));
+  await page.waitForURL("**/apps/openclash-luci", { timeout: 10_000 });
+  const frame = page.frameLocator('iframe[title="OpenClash (LuCI)"]');
+  await frame.locator(".main-cards-container").waitFor({ state: "visible" });
+  await frame.locator("#mainmenu").waitFor({ state: "hidden" });
+  assert.deepEqual(luciRequests, [{ method: "GET", mode: "navigate", destination: "iframe" }]);
+  await page.getByRole("link", { name: "应用中心", exact: true }).waitFor({ state: "visible" });
+  for (const [width, columns] of [[1280, 2], [390, 1]]) {
+    await page.setViewportSize({ width, height: 900 });
+    const cards = frame.locator(".main-cards-container");
+    await cards.evaluate((node, expected) => new Promise((resolve, reject) => {
+      const deadline = performance.now() + 2_000;
+      function check() {
+        const style = getComputedStyle(node);
+        const columns = style.gridTemplateColumns.split(/\s+/).length;
+        if (style.display === "grid" && columns === expected) resolve();
+        else if (performance.now() > deadline)
+          reject(new Error(`Expected ${expected} grid columns at iframe width ${innerWidth}px; got ${columns}`));
+        else requestAnimationFrame(check);
+      }
+      check();
+    }), columns);
+    assert.ok(await frame.locator(".main-card").evaluateAll(nodes =>
+      nodes.length > 0 && nodes.every(node => getComputedStyle(node).display === "grid")));
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const unexpected = pageErrors.filter(message => !message.includes("404"));
   assert.deepEqual(unexpected, []);
   pageErrors.length = 0;
 
@@ -152,7 +236,9 @@ try {
 
   const report = [
     "PASS: HigoOS app-center OpenClash button was clicked in headless Chromium",
-    `PASS: same-tab, top-level document navigation to ${href} (LuCI login response mocked)`,
+    "PASS: the HigoOS route stays open and loads native LuCI in its content frame",
+    "PASS: HigoOS sign-in establishes a separate LuCI cookie in the authentication fixture",
+    "PASS: native OpenClash cards use two columns on desktop and one on mobile without external CSS",
     "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,

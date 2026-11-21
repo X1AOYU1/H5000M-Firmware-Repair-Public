@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory() as temporary:
     for to in (fallback, f'({expression}?{{path:"/apps/openclash"}}:{fallback})'):
         asset.write_text(
             'const s=()=>{},r=(tag,props)=>[tag,props.href],ue=()=>"",me="",'
-            'u=null,k=(_,props)=>["router-link",props.to.path];'
+            'c=fn=>fn,x=()=>{},u=null,k=(_,props)=>["router-link",props.to.path];'
             f'const card=t=>t.kind==="native"?(s(),k(u,{{key:0,to:{to}}})):["legacy","existing"];',
             encoding="utf-8",
         )
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as temporary:
         assert asset.read_text(encoding="utf-8") == patched
         subprocess.run(
             ["node", "-e", patched + """
-                const expectedNative = ["a", "/cgi-bin/luci/admin/services/openclash"];
+                const expectedNative = ["router-link", "/apps/openclash-luci"];
                 const cases = [
                   [{kind:"native",featureKey:"openclash"}, expectedNative],
                   [{kind:"native",name:"luci-app-openclash",entryRoute:{path:"/wrong"}}, expectedNative],

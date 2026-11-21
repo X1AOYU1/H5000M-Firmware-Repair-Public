@@ -16,6 +16,7 @@ python3 scripts/clean-public-openclash-config.py "$OUT/rootfs" | tee "$OUT/openc
 python3 scripts/patch-higoros-openclash-backup-import.py "$OUT/rootfs" | tee "$OUT/openclash-backup-import.txt"
 python3 scripts/patch-higoros-openclash-proxy-select.py "$OUT/rootfs" | tee "$OUT/openclash-proxy-select.txt"
 python3 scripts/patch-higoros-openclash-entry.py "$OUT/rootfs" | tee "$OUT/openclash-entry-route.txt"
+python3 scripts/patch-native-openclash-ui.py "$OUT/rootfs" | tee "$OUT/native-openclash-ui.txt"
 python3 scripts/patch-higoros-openclash-bulk-latency.py "$OUT/rootfs" | tee "$OUT/openclash-bulk-latency.txt"
 python3 scripts/patch-openclash-meta-core-link.py "$OUT/rootfs" | tee "$OUT/openclash-meta-core-link.txt"
 
@@ -56,7 +57,7 @@ checks = {
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,
     "wallpaper crop controls and upload": len(crop_modules) == 1 and all(value in crop_modules[0].read_text(encoding="utf-8") for value in ("pointermove", 'data-control="zoom"', "保存裁切并应用", "canvas.toBlob", "await upload(output)")),
     "original HigoOS OpenClash page retained": openclash_page.stat().st_size > 1000 and 'y("iframe"' not in openclash_page.read_text(encoding="utf-8"),
-    "OpenClash app-center button opens the standalone LuCI page": 'href:"/cgi-bin/luci/admin/services/openclash"' in plugin_page and 'entry({"admin", "services", "openclash"}' in openclash_controller and (root / "www/cgi-bin/luci").is_file(),
+    "OpenClash app-center button embeds native LuCI": 'to:{path:"/apps/openclash-luci"}' in plugin_page and 'path:"apps/openclash-luci"' in app_router and 'entry({"admin", "services", "openclash"}' in openclash_controller and (root / "www/cgi-bin/luci").is_file(),
     "OpenClash runtime one-click latency test": all(value in openclash_page.read_text(encoding="utf-8") for value in ("一键测速", "h5000mRunAllLatency", "Math.min(5,h5000mNodes.length)", "h5000mBulkProgress", '"test-latency",name', 'de.value[String(result.name)]')) and openclash_page.read_text(encoding="utf-8").count("h5000mRunAllLatency") == 2,
     "OpenClash manual selection readback recovery": all(value in openclash_page.read_text(encoding="utf-8") for value in ("h5000mConfirmProxySelection", 'includes("节点选择回读不一致")', 'selected?.now===name')) and openclash_page.read_text(encoding="utf-8").count("async function h5000mConfirmProxySelection(") == 1,
     "Meta core canonical executable link repaired": all(value in openclash_subscribe for value in ('ensure_meta_core_compat_link()', 'ensure_meta_core_compat_link || {', '/etc/openclash/core/clash_meta', '/tmp/etc/openclash/core/clash_meta')) and 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in openclash_core_update,
@@ -199,12 +200,14 @@ root = Path(sys.argv[1])
 assets = root / "usr/share/higoros/web/assets"
 plugins = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
 router = next(path.read_text(encoding="utf-8") for path in assets.glob("index-*.js") if 'path:"apps/openclash"' in path.read_text(encoding="utf-8"))
-assert 'href:"/cgi-bin/luci/admin/services/openclash"' in plugins
+assert 'to:{path:"/apps/openclash-luci"}' in plugins
 assert 'path:"apps/openclash"' in router
+assert 'path:"apps/openclash-luci"' in router
+assert len(list(assets.glob("higoos-native-openclash-*.js"))) == 1
 assert (root / "www/cgi-bin/luci").is_file()
 assert (root / "www/luci-static/resources/openclash").is_dir()
 assert 'entry({"admin", "services", "openclash"}' in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8")
-print("PASS: final firmware includes the registered LuCI OpenClash page and its app-center link")
+print("PASS: final firmware includes the registered LuCI OpenClash page and its embedded HigoOS entry")
 PY
 python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" "$OUT/final-root/usr/share/higoros/web/assets" "$OUT/final-root/usr/share/openclash" <<'PY'
 from pathlib import Path

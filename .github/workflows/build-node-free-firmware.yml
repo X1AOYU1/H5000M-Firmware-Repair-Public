@@ -138,7 +138,7 @@ jobs:
           name: H5000M complete repair, node-free
           body: >-
             Built from the complete repair baseline. The OpenClash app-center
-            card opens the standalone LuCI page. The previous HigoOS address
+            card opens native LuCI inside the HigoOS layout. The previous HigoOS address
             remains available with filtered backup import;
             proxy nodes and subscription credentials were removed. Other
             firmware repairs and H5000M upgrade metadata were verified.
