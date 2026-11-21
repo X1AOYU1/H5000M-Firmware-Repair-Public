@@ -39,13 +39,24 @@ def patch(root: Path) -> None:
         page.write_text(body, encoding="utf-8")
 
     body = page.read_text(encoding="utf-8")
+    avatar_setup = 'const h5000mDeviceAvatar=createDeviceAvatar({defineComponent:Z,h:Be,ref:M});'
+    avatar = 'e("img",{src:s(de)(t.osType),alt:"",class:"w-6 h-6 object-contain"},null,8,Bs)'
+    if avatar_setup not in body:
+        if body.count(vendor_setup) != 1 or body.count(avatar) != 1:
+            raise SystemExit("ERROR: HigoOS device avatar anchors changed")
+        body = body.replace('import{createDeviceVendor}from', 'import{createDeviceVendor,createDeviceAvatar}from', 1)
+        body = body.replace(vendor_setup, vendor_setup + avatar_setup, 1)
+        body = body.replace(avatar, 'r(h5000mDeviceAvatar,{mac:t.macAddress,fallback:s(de)(t.osType)},null,8,["mac","fallback"])', 1)
+        page.write_text(body, encoding="utf-8")
+
+    body = page.read_text(encoding="utf-8")
     link_setup = 'const h5000mLanLink=createLanLink(Be);'
     if link_setup not in body:
-        anchor = 'setup(l,{emit:g}){' + vendor_setup + 'const h5000mDeviceRemark='
+        anchor = 'setup(l,{emit:g}){' + vendor_setup + avatar_setup + 'const h5000mDeviceRemark='
         rate = 'e("span",Ks,o(s(at)(t.connectionDetail)),1)'
         if body.count(anchor) != 1 or body.count(rate) != 1:
             raise SystemExit("ERROR: HigoOS LAN link card anchors changed")
-        body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + vendor_setup + 'const h5000mDeviceRemark=', 1)
+        body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + vendor_setup + avatar_setup + 'const h5000mDeviceRemark=', 1)
         body = body.replace(rate, 'r(h5000mLanLink,{device:t,fallback:s(at)(t.connectionDetail)},null,8,["device","fallback"])', 1)
         page.write_text('import{createLanLink}from"./higoos-lan-link.js";' + body, encoding="utf-8")
 
