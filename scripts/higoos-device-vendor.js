@@ -53,8 +53,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
   return defineComponent({name:'HigoosDeviceAvatar', props:{mac:String, name:String, fallback:String}, setup(props) {
     const show = ref(false), busy = ref(false), error = ref('');
     const key = () => (props.mac || '').replace(/[:-]/g, '').toLowerCase();
-    async function save(event) {
-      const value = event.target.value;
+    async function save(value) {
       if (!/^[0-9a-f]{12}$/.test(key())) return;
       busy.value = true; error.value = '';
       try {
@@ -73,9 +72,12 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
         : h('img', {src:props.fallback, alt:'', class:'w-6 h-6 object-contain'});
       return h('div', {style:{position:'relative'}}, [
         h('button', {type:'button', title:'选择设备头像', 'aria-label':'选择设备头像', onClick:()=>{show.value=!show.value;error.value='';}}, [image]),
-        show.value ? h('div', {style:{position:'absolute',top:'100%',left:'0',zIndex:'30',minWidth:'160px',padding:'8px',borderRadius:'8px',background:'var(--bg-1, #fff)',boxShadow:'0 4px 18px rgba(0,0,0,.25)'}}, [
-          h('select', {value:choices.value[key()] || '', disabled:busy.value, onChange:save, 'aria-label':'设备头像', style:{width:'100%',color:'#111',background:'#fff'}}, [
-            h('option', {value:''}, '自动识别'), ...['Samsung','Huawei','Apple','Xiaomi','OPPO','vivo','Honor','Lenovo','ASUS','Dell','HP','Computer','Phone','Tablet','TV'].map(name=>h('option',{value:name},name))
+        show.value ? h('div', {role:'dialog','aria-label':'选择设备头像',style:{position:'absolute',top:'calc(100% + 8px)',left:'0',zIndex:'50',width:'220px',padding:'12px',borderRadius:'12px',background:'var(--bg-1, #fff)',color:'var(--text-1, #1f2937)',boxShadow:'0 8px 24px rgba(0,0,0,.2)',border:'1px solid var(--line-1, #e5e7eb)'}}, [
+          h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px',fontWeight:'600',fontSize:'14px'}}, [
+            h('span', {}, '选择设备头像'), h('button',{type:'button','aria-label':'关闭',onClick:()=>{show.value=false;},style:{border:'0',background:'transparent',color:'inherit',fontSize:'18px',cursor:'pointer'}},'×')
+          ]),
+          h('div', {style:{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:'6px',maxHeight:'230px',overflowY:'auto'}}, [
+            ...[['','自动识别'], ...['Samsung','Huawei','Apple','Xiaomi','OPPO','vivo','Honor','Lenovo','ASUS','Dell','HP','Computer','Phone','Tablet','TV'].map(name=>[name,name])].map(([value,label])=>h('button',{type:'button',disabled:busy.value,onClick:()=>save(value),style:{padding:'7px 3px',border:'1px solid var(--line-1, #e5e7eb)',borderRadius:'7px',background:(choices.value[key()] || '')===value?'rgba(0,123,196,.16)':'transparent',color:'inherit',fontSize:'12px',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis'}},label))
           ]), error.value ? h('p', {role:'alert',style:{color:'#dc2626',fontSize:'12px'}}, error.value) : null
         ]) : null
       ]);

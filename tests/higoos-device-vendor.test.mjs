@@ -47,10 +47,10 @@ const interactive = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, tex
 await new Promise(resolve=>setTimeout(resolve, 0));
 const render = interactive.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'});
 render().text[0].attrs.onClick();
-await render().text[1].text[0].attrs.onChange({target:{value:'Samsung'}});
+await render().text[1].text[1].text[1].attrs.onClick();
 assert.equal(saved.c6ac9ff69422, 'Samsung');
 assert.equal(render().text[0].text[0].text, 'Samsung');
 render().text[0].attrs.onClick();
-await render().text[1].text[0].attrs.onChange({target:{value:''}});
+await render().text[1].text[1].text[0].attrs.onClick();
 assert.equal(render().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: select, save, display and reset a device avatar');
