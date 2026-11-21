@@ -12,7 +12,7 @@ shutil.copy2('/usr/bin/qemu-aarch64-static', root / 'usr/bin/qemu-aarch64-static
 (root / 'tmp/higoros-audit-state/devices-state.json').write_text('{}')
 password_hash = subprocess.check_output(['openssl', 'passwd', '-6', 'synthetic-audit-only'], text=True).strip()
 (root / 'etc/shadow').write_text('root:' + password_hash + ':19000:0:99999:7:::\n')
-env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='error')
+env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='debug', QEMU_STRACE='1')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
 (root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
 (root / 'dev').mkdir(exist_ok=True)
@@ -61,7 +61,10 @@ try:
     print('synthetic state JSON keys:', list(json.loads(p.read_text()).keys()))
 finally:
     daemon_log.flush(); daemon_log.seek(0)
-    print('daemon diagnostics:', daemon_log.read()[-8000:])
+    lines = daemon_log.read().splitlines()
+    failures = [line for line in lines if any(term in line.lower() for term in ('enoent', 'econnrefused', 'enodev', 'eacces', 'failed', 'error'))]
+    print('daemon diagnostic failures (last 80):')
+    for line in failures[-80:]: print(line[:350])
     daemon_log.close()
     for service in services: service.terminate()
     proc.terminate()
