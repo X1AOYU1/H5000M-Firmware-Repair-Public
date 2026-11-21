@@ -29,9 +29,9 @@ local ubus = require "ubus"
 local uloop = require "uloop"
 uloop.init()
 local conn = assert(ubus.connect())
-assert(conn:add({ ["network.interface.lan"] = { status = { function(req, msg)
+conn:add({ ["network.interface.lan"] = { status = { function(req, msg)
   conn:reply(req, { up=true, pending=false, available=true, device="auditlan0", l3_device="auditlan0", proto="static", ["ipv4-address"]={{address="192.0.2.1",mask=24}} })
-end, {} } } }))
+end, {} } } })
 uloop.run()
 ''')
 services = []
