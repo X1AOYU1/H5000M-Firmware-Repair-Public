@@ -10,7 +10,7 @@ export function lanLinkLabel(interfaces) {
 export function createLanLink(h) {
   return {
     name: 'H5000mLanLink',
-    props: { device: Object },
+    props: { device: Object, fallback: String },
     data() { return { speed: '', timer: null, stopped: false }; },
     mounted() {
       const update = async () => {
@@ -26,8 +26,8 @@ export function createLanLink(h) {
     unmounted() { this.stopped = true; clearTimeout(this.timer); },
     render() {
       const d = this.device;
-      if (!d?.isOnline || (d.connectionDetail?.kind !== 'wired' && d.connectionType !== 'wired') || !this.speed) return null;
-      return h('span', { class: 'text-xs text-txt-3', title: '路由器 LAN 端口协商速率；经过交换机时不代表终端速率' }, `（LAN 口 ${this.speed}）`);
+      const wired = d?.isOnline && (d.connectionDetail?.kind === 'wired' || d.connectionType === 'wired');
+      return h('span', { class: 'text-xs text-txt-3', title: wired && this.speed ? '路由器 LAN 口协商速率' : undefined }, wired && this.speed ? this.speed : this.fallback);
     },
   };
 }

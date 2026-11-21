@@ -367,7 +367,7 @@ try {
   assert.equal(page.url(), baseUrl + "/apps/passwall-luci");
 
   await page.goto(baseUrl + "/devices", { waitUntil: "domcontentloaded" });
-  await page.getByText("（LAN 口 2500 Mbps）", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByText("2500 Mbps", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
   const remark = page.getByRole("button", { name: "备注：测试手机", exact: true });
   const input = page.getByPlaceholder("输入设备备注");
   const saveRemark = page.getByRole("button", { name: "保存", exact: true });

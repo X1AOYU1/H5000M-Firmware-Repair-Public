@@ -22,7 +22,7 @@ def patch(root: Path) -> None:
         for old, new in edits:
             body = body.replace(old, new, 1)
         page.write_text('import{createDeviceRemark}from"./higoos-device-remarks.js";' + body, encoding="utf-8")
-    elif not all(body.count(new) == 1 for _, new in edits):
+    elif not (body.count('const h5000mDeviceRemark=createDeviceRemark({defineComponent:Z,h:Be,ref:M,Modal:N,Button:V,Input:X})') == 1 and body.count(edits[1][1]) == 1):
         raise SystemExit("ERROR: HigoOS device card anchors changed")
 
     body = page.read_text(encoding="utf-8")
@@ -33,7 +33,7 @@ def patch(root: Path) -> None:
         if body.count(anchor) != 1 or body.count(rate) != 1:
             raise SystemExit("ERROR: HigoOS LAN link card anchors changed")
         body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + 'const h5000mDeviceRemark=', 1)
-        body = body.replace(rate, rate + ',r(h5000mLanLink,{device:t},null,8,["device"])', 1)
+        body = body.replace(rate, 'r(h5000mLanLink,{device:t,fallback:s(at)(t.connectionDetail)},null,8,["device","fallback"])', 1)
         page.write_text('import{createLanLink}from"./higoos-lan-link.js";' + body, encoding="utf-8")
 
     type_anchor = 'v=A(()=>g.data.value??[])'
@@ -44,6 +44,26 @@ def patch(root: Path) -> None:
             raise SystemExit("ERROR: device list type anchor changed")
         body = 'import{inferDeviceType}from"./higoos-device-type.js";' + body.replace(type_anchor, type_replacement, 1)
         page.write_text(body, encoding="utf-8")
+
+    # Fetch the list and traffic ranking as a single batch so both queries see
+    # the same refresh cycle. Keep failures independent for the two panels.
+    queries = list(assets.glob("devices.queries-*.js"))
+    if len(queries) != 1:
+        raise SystemExit("ERROR: expected one device query asset")
+    query = queries[0]
+    source = query.read_text(encoding="utf-8")
+    batch = ('let h5000mBatch,h5000mBatchAt=0;const h5000mFetch=i=>{'
+             'const now=Date.now();if(!h5000mBatch||now-h5000mBatchAt>4000){'
+             'h5000mBatchAt=now;h5000mBatch=Promise.allSettled([y.getDevices(),y.getTrafficRanking()])}'
+             'return h5000mBatch.then(results=>{const r=results[i];if(r.status==="rejected")throw r.reason;return r.value})};')
+    if 'const h5000mFetch=i=>' not in source:
+        anchor = 'h=5e3,re=(e=!0)=>m({'
+        if source.count(anchor) != 1 or source.count('queryFn:()=>y.getDevices()') != 1 or source.count('queryFn:()=>y.getTrafficRanking()') != 1:
+            raise SystemExit("ERROR: device refresh anchors changed")
+        source = source.replace(anchor, 'h=5e3;'+batch+'const re=(e=!0)=>m({', 1)
+        source = source.replace('queryFn:()=>y.getDevices()', 'queryFn:()=>h5000mFetch(0)', 1)
+        source = source.replace('queryFn:()=>y.getTrafficRanking()', 'queryFn:()=>h5000mFetch(1)', 1)
+        query.write_text(source, encoding="utf-8")
 
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
     controller_source = controller.read_text(encoding="utf-8")

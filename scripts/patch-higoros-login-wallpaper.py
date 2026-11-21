@@ -48,7 +48,7 @@ login_probe = (
     '.h5000m-wallpaper-active .login-glow{display:none!important}\';'
     'styleTag.textContent+=\' .h5000m-wallpaper-active .text-txt-1,'+
     '.h5000m-wallpaper-active .text-txt-2,.h5000m-wallpaper-active .text-txt-4{color:#fff!important;'+
-    'text-shadow:0 1px 4px #000,0 0 8px #000}'+
+    'text-shadow:0 1px 2px #000b}'+
     '.h5000m-wallpaper-active .login-input{background:rgba(15,23,42,.68)!important;'+
     'color:#fff!important;border-color:rgba(255,255,255,.35)!important;text-shadow:none}'+
     '.h5000m-wallpaper-active .login-input::placeholder{color:#d1d5db!important;opacity:1}'+
@@ -156,14 +156,16 @@ if crop_call not in native:
 
 upload_anchor = 'try{await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision}),u.value=null'
 upload_replacement = (
-    'try{const uploadedName=u.value.name;try{localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
-    'await l.mutateAsync({file:u.value,revision:c?.revision||s.data.value.newRevision});'
+    'try{const cropped=await window.higoosCropBeforeUpload(u.value);if(!cropped)return;u.value=cropped;const uploadedName=u.value.name;try{localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
+    'await l.mutateAsync({file:u.value,revision:s.data.value.files.find(d=>d.name===uploadedName)?.revision||s.data.value.newRevision});'
     'try{if(/\\.(?:jpe?g|png|gif|webp)$/i.test(uploadedName))localStorage.setItem('
     '"higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName));'
     'u.value=null'
 )
 if native.count(upload_anchor) == 1:
     native = native.replace(upload_anchor, upload_replacement, 1)
+elif 'const uploadedName=u.value.name;' in native and 'window.higoosCropBeforeUpload(u.value)' not in native:
+    native = native.replace('try{const uploadedName=u.value.name;', 'try{const cropped=await window.higoosCropBeforeUpload(u.value);if(!cropped)return;u.value=cropped;const uploadedName=u.value.name;', 1)
 elif 'const uploadedName=u.value.name;' not in native:
     raise SystemExit("ERROR: Argon background upload success handler changed")
 cache_reset = 'localStorage.removeItem("higoos_argon_login_wallpaper_source")'
