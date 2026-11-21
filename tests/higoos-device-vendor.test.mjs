@@ -31,6 +31,10 @@ assert.equal(brandFromDeviceName('unknown device'), '');
 const avatar = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, attrs, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
 assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text[0].attrs.src, '/assets/device-logos/huawei.svg');
+const fitted = avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})();
+assert.equal(fitted.text[0].attrs.style.width, '54px');
+assert.equal(fitted.text[0].text[0].attrs.style.width, '48px');
+assert.equal(fitted.text[0].text[0].text[0].attrs.style.objectFit, 'contain');
 assert.equal(avatar.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'})().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: recognized brands get avatars, randomized addresses retain device icon');
 
@@ -65,7 +69,7 @@ const appleLogo = await readFile('scripts/device-logos/apple.svg', 'utf8');
 assert.match(appleLogo, /viewBox="0 0 64 64"/);
 assert.match(appleLogo, /<path[^>]+fill="#111827"/);
 assert.doesNotMatch(appleLogo, />Apple<\/text>/);
-for (const icon of ['computer','tv','phone','tablet']) {
+for (const icon of ['computer','tv','phone','tablet','samsung']) {
   const svg = await readFile(`scripts/device-logos/${icon}.svg`, 'utf8');
   assert.match(svg, /viewBox="0 0 64 64"/);
   assert.match(svg, /#[0-9a-fA-F]{6}/);
