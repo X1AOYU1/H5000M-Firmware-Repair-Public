@@ -14,7 +14,7 @@ assert.ok(Object.keys(vendors).length > 50000);
 console.log("PASS: longest IEEE prefix and randomized MAC filtering");
 
 let requested = '';
-globalThis.fetch = async url => { requested = url; return {ok:true, json: async () => ({'E00630':'HUAWEI TECHNOLOGIES CO.,LTD'})}; };
+globalThis.fetch = async url => { if (url.includes('ieee-vendors')) { requested = url; return {ok:true, json: async () => ({'E00630':'HUAWEI TECHNOLOGIES CO.,LTD'})}; } return {ok:true,json:async()=>({token:'test',avatars:{}})}; };
 const { createDeviceVendor, createDeviceAvatar, vendorBrand } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const component = createDeviceVendor({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
@@ -27,6 +27,6 @@ assert.equal(vendorBrand('EliteGroup Computer Systems Co., LTD'), 'ECS');
 assert.equal(vendorBrand('Unknown manufacturer'), '');
 const avatar = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, attrs, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
-assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text, 'HUAWEI');
-assert.equal(avatar.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'})().attrs.src, 'device.svg');
+assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text, 'HUAWEI');
+assert.equal(avatar.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'})().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: recognized brands get avatars, randomized addresses retain device icon');

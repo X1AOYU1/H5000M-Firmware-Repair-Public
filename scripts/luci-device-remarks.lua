@@ -27,13 +27,32 @@ function action_higoros_device_remarks()
 	end
 	if method == "GET" then
 		local remarks = {}
+		local avatars = {}
 		for name in LFS.dir(store) or function() return nil end do
 			if name:match("^[0-9a-f][0-9a-f]+$") and #name == 12 then
 				local note = LFS.readfile(store .. "/" .. name)
 				if note and #note <= 256 then remarks[name] = note end
 			end
+			local mac = name:match("^avatar%-([0-9a-f]+)$")
+			if mac and #mac == 12 then
+				local avatar = LFS.readfile(store .. "/" .. name)
+				if avatar and #avatar <= 32 then avatars[mac] = avatar end
+			end
 		end
-		return reply(200, "OK", { remarks = remarks, token = token })
+		return reply(200, "OK", { remarks = remarks, avatars = avatars, token = token })
+	end
+	if HTTP.formvalue("kind") == "avatar" then
+		local value = HTTP.formvalue("avatar") or ""
+		local allowed = { Samsung=true, Huawei=true, Apple=true, Xiaomi=true, OPPO=true, vivo=true, Honor=true, Lenovo=true, ASUS=true, Dell=true, HP=true, Computer=true, Phone=true, Tablet=true, TV=true }
+		if value ~= "" and not allowed[value] then return reply(400, "Bad Request", {error="头像选项无效"}) end
+		local path = store .. "/avatar-" .. key
+		if value == "" then
+			if not LFS.unlink(path) and LFS.stat(path) then return reply(500, "Internal Server Error", {error="重置头像失败"}) end
+		else
+			if not LFS.stat(store) and not LFS.mkdir(store) then return reply(500, "Internal Server Error", {error="无法创建存储目录"}) end
+			if not LFS.writefile(path, value) then return reply(500, "Internal Server Error", {error="保存头像失败"}) end
+		end
+		return reply(200, "OK", {avatar=value})
 	end
 	local note = HTTP.formvalue("note")
 	if type(note) ~= "string" or #note > 256 or note:find("[%z\1-\31\127]") then

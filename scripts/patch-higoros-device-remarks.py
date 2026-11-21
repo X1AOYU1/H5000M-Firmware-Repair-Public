@@ -104,6 +104,10 @@ def patch(root: Path) -> None:
         controller.write_text(controller_source, encoding="utf-8")
     elif "function action_higoros_device_remarks()" not in controller_source:
         raise SystemExit("ERROR: device remarks route has no handler")
+    else:
+        start = controller_source.index("function action_higoros_device_remarks()")
+        end = controller_source.index(handler_anchor, start)
+        controller.write_text(controller_source[:start] + handler.rstrip() + "\n" + controller_source[end:], encoding="utf-8")
     files = {
         assets / "higoos-lan-link.js": (sources / "higoos-lan-link.js").read_text(encoding="utf-8"),
         assets / "higoos-device-type.js": (sources / "higoos-device-type.js").read_text(encoding="utf-8"),
