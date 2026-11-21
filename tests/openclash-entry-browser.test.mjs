@@ -21,20 +21,22 @@ const app = {
   kind: "native",
   entryRoute: { path: "/wrong" },
 };
+const apiData = {
+  "/api/v1/auth/me": { username: "route-audit", role: "admin", permissions: ["*"] },
+  "/api/v1/plugins/apps": { apps: [app] },
+  "/api/v1/notifications": [],
+  "/api/v1/notifications/settings": { enabled: false },
+  "/api/v1/openclash/status": { running: false, coreAvailable: false },
+  "/api/v1/openclash/settings": { revision: "audit", fields: [], values: {} },
+  "/api/v1/openclash/files": { rows: [] },
+  "/api/v1/openclash/log": { text: "OpenClash audit log" },
+};
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   if (url.pathname.startsWith("/api/v1/")) {
     apiRequests.push(`${request.method} ${url.pathname}`);
-    const data = url.pathname === "/api/v1/auth/me"
-      ? { username: "route-audit", role: "admin", permissions: ["*"] }
-      : url.pathname === "/api/v1/plugins/apps"
-        ? { apps: [app] }
-        : url.pathname === "/api/v1/notifications"
-          ? []
-          : url.pathname === "/api/v1/notifications/settings"
-            ? { enabled: false }
-            : {};
+    const data = apiData[url.pathname] ?? {};
     response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ code: 0, data }));
     return;
@@ -98,6 +100,31 @@ try {
   await openLink.click();
   await page.waitForURL("**/apps/openclash", { timeout: 10_000 });
   await page.getByText("基本设置", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByText("配置文件", { exact: true }).click();
+  const operation = page.locator("#oc-backup-file-type");
+  await operation.waitFor({ state: "visible", timeout: 5_000 });
+  assert.equal(await operation.count(), 1);
+  const choose = page.getByRole("button", { name: "选择文件", exact: true });
+  const backup = page.getByRole("button", { name: "备份", exact: true });
+  const createType = page.locator("#oc-new-file-type");
+  await choose.waitFor({ state: "visible" });
+  await backup.waitFor({ state: "visible" });
+  assert.equal(await createType.isVisible(), false);
+  await operation.selectOption("create-file");
+  await createType.waitFor({ state: "visible" });
+  assert.equal(await choose.isVisible(), false);
+  await createType.selectOption("rule-provider");
+  assert.equal(await createType.inputValue(), "rule-provider");
+  await page.getByPlaceholder("文件名.yaml").fill("audit.yaml");
+  assert.ok(await page.getByRole("button", { name: "新建文件", exact: true }).isEnabled());
+  await operation.selectOption("backup-file");
+  await choose.waitFor({ state: "visible" });
+  assert.equal(await createType.isVisible(), false);
+  await page.getByText("日志", { exact: true }).click();
+  await page.getByText("OpenClash audit log", { exact: true }).waitFor({ state: "visible" });
+  assert.equal(await operation.count(), 0);
+  await page.getByText("配置文件", { exact: true }).click();
+  await operation.waitFor({ state: "visible" });
   assert.ok(apiRequests.includes("GET /api/v1/auth/me"), "route guard auth probe was not exercised");
   assert.deepEqual(pageErrors, [], `browser errors: ${pageErrors.join(" | ")}`);
 
@@ -105,6 +132,7 @@ try {
     "PASS: HigoOS app-center OpenClash button was clicked in headless Chromium",
     `PASS: card link target ${href}; router reached ${new URL(page.url()).pathname}`,
     "PASS: OpenClash page rendered its native settings tab without browser errors",
+    "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,
   ].join("\n") + "\n";
   await (await import("node:fs/promises")).writeFile(reportPath, report, "utf8");
