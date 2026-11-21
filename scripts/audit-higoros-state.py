@@ -15,6 +15,11 @@ password_hash = subprocess.check_output(['openssl', 'passwd', '-6', 'synthetic-a
 env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='error')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
 (root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
+(root / 'dev').mkdir(exist_ok=True)
+for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
+    device = root / 'dev' / name
+    if not device.exists():
+        os.mknod(device, 0o20666, os.makedev(1, minor))
 services = []
 for binary in ['/sbin/ubusd', '/sbin/rpcd']:
     services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
