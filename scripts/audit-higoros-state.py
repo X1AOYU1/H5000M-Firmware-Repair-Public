@@ -24,13 +24,22 @@ for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
     if not device.exists():
         os.mknod(device, 0o20666, os.makedev(1, minor))
 services = []
+service_logs = []
 for binary in ['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd']:
-    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
+    log = open(root / ('tmp/audit-' + binary.rsplit('/', 1)[-1] + '.log'), 'w+')
+    service_logs.append(log)
+    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=log, stderr=log))
     time.sleep(1)
 print('ubusd/rpcd/netifd running:', [p.poll() is None for p in services])
 for name, service in zip(['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd'], services):
     if service.poll() is not None:
-        print('service diagnostic:', name, service.returncode, service.stderr.read().decode('utf-8', 'replace')[:2000])
+        print('service exited:', name, service.returncode)
+for args in [['list'], ['call', 'network.interface.lan', 'status']]:
+    try:
+        result = subprocess.run(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/bin/ubus'] + args, env=env, capture_output=True, text=True, timeout=15)
+        print('ubus diagnostic:', args, result.returncode, result.stdout[:2000], result.stderr[:1000])
+    except subprocess.TimeoutExpired:
+        print('ubus diagnostic timed out:', args)
 daemon_log = open(root / 'tmp/higoros-audit-daemon.log', 'w+')
 proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=daemon_log)
 try:
@@ -69,6 +78,10 @@ finally:
     print('daemon diagnostic failures (last 80):')
     for line in failures[-80:]: print(line[:350])
     daemon_log.close()
+    for name, log in zip(['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd'], service_logs):
+        log.flush(); log.seek(0)
+        print('service log:', name, log.read()[-4000:])
+        log.close()
     for service in services: service.terminate()
     proc.terminate()
     try: proc.wait(timeout=5)
