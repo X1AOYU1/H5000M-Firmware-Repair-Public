@@ -25,6 +25,15 @@ def patch(root: Path) -> None:
     elif not all(body.count(new) == 1 for _, new in edits):
         raise SystemExit("ERROR: HigoOS device card anchors changed")
 
+    type_anchor = 'v=A(()=>g.data.value??[])'
+    type_replacement = 'v=A(()=>(g.data.value??[]).map(inferDeviceType))'
+    body = page.read_text(encoding="utf-8")
+    if type_replacement not in body:
+        if body.count(type_anchor) != 1:
+            raise SystemExit("ERROR: device list type anchor changed")
+        body = 'import{inferDeviceType}from"./higoos-device-type.js";' + body.replace(type_anchor, type_replacement, 1)
+        page.write_text(body, encoding="utf-8")
+
     controller = root / "usr/lib/lua/luci/controller/openclash.lua"
     controller_source = controller.read_text(encoding="utf-8")
     route_anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
@@ -41,6 +50,7 @@ def patch(root: Path) -> None:
     elif "function action_higoros_device_remarks()" not in controller_source:
         raise SystemExit("ERROR: device remarks route has no handler")
     files = {
+        assets / "higoos-device-type.js": (sources / "higoos-device-type.js").read_text(encoding="utf-8"),
         assets / "higoos-device-remarks.js": (sources / "higoos-device-remarks.js").read_text(encoding="utf-8"),
         root / "lib/upgrade/keep.d/higoos-device-remarks": "/etc/higoos-device-remarks/\n",
     }

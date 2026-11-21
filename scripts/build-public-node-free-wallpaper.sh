@@ -53,7 +53,7 @@ package = next((assets.glob("PackagesPage-*.js")), None)
 crop_modules = list(assets.glob("higoos-wallpaper-crop-*.js"))
 checks = {
     "login wallpaper image rendering": "higoos-login-wallpaper." in login and 'wallpaper.value?i("img",{src:wallpaper.value' in login,
-    "wallpaper login card becomes fully transparent only when a wallpaper is active": 'if(!wallpaper.value){' in login and 'activeCard&&originalStyles' in login and 'card.style.setProperty("background-color","transparent","important")' in login and 'input[type="password"]' in login and 'new MutationObserver(q)' in login,
+    "wallpaper login card becomes fully transparent only when a wallpaper is active": 'if(!wallpaper.value){' in login and 'h5000m-wallpaper-transparent' in login and 'background:transparent!important' in login and 'html[data-theme="light"]' in login and 'html[data-theme="dark"]' in login and 'new MutationObserver(q)' in login,
     "wallpaper upload cache reset": 'localStorage.removeItem("higoos_argon_login_wallpaper_source")' in native,
     "Argon upload publication": 'new File([blob],aliasName' in native,
     "wallpaper crop module is imported": len(crop_modules) == 1 and re.search(r'import\{mountHigoosWallpaperCrop\}from"\./higoos-wallpaper-crop-h5000m[a-f0-9]+\.js";', native) is not None,

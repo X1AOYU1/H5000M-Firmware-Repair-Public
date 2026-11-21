@@ -29,21 +29,26 @@ login_probe = (
     'if(w&&w.startsWith("/luci-static/argon/background/"))p.push(w)}catch{}'
     'p.push(...["webp","png","jpg","jpeg","gif"].map(e=>"/luci-static/argon/background/higoos-login-wallpaper."+e));'
     'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>wallpaper.value=w+"?v="+Date.now();'
-    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo,activeCard,originalStyles;const q=()=>{'
-    'if(!wallpaper.value){if(activeCard&&originalStyles)for(const [key,[value,priority]] of Object.entries(originalStyles)){'
-    'if(value)activeCard.style.setProperty(key,value,priority);else activeCard.style.removeProperty(key)}'
-    'activeCard=null;originalStyles=null;return}if(activeCard)return;'
-    'const input=document.querySelector(\'input[type="password"]\');for(let card=input?.parentElement;card&&card!==document.body;card=card.parentElement){'
-    'const box=card.getBoundingClientRect(),style=getComputedStyle(card),color=/rgba?\\(([^)]+)\\)/.exec(style.backgroundColor),parts=color?.[1].split(",").map(Number),'
-    'white=parts&&parts.slice(0,3).every(value=>value>245)&&(parts[3]??1)>.95;'
-    'if(box.width>=320&&box.height>=250&&style.borderRadius!=="0px"&&white){activeCard=card;'
-    'originalStyles=Object.fromEntries(["background-color","backdrop-filter","-webkit-backdrop-filter","border-color","box-shadow"]'
-    '.map(key=>[key,[card.style.getPropertyValue(key),card.style.getPropertyPriority(key)]]));'
-    'card.style.setProperty("background-color","transparent","important");'
-    'card.style.setProperty("backdrop-filter","none","important");card.style.setProperty("-webkit-backdrop-filter","none","important");'
-    'card.style.setProperty("border-color","transparent","important");'
-    'card.style.setProperty("box-shadow","none","important");break}}};q();'
-    'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true})})()'
+    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo,activeCard,styleTag;const q=()=>{'
+    'if(!wallpaper.value){activeCard?.classList.remove("h5000m-wallpaper-transparent");'
+    'document.querySelector(".min-h-screen.h5000m-wallpaper-active")?.classList.remove("h5000m-wallpaper-active");styleTag?.remove();'
+    'activeCard=null;styleTag=null;return}const card=document.querySelector(".router-card.login-card");if(!card)return;'
+    'const page=card.closest(".min-h-screen");'
+    'if(!styleTag){styleTag=document.createElement("style");styleTag.textContent='
+    '\'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent,'+
+    'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent:before,'+
+    'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent:after,'+
+    'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent,'+
+    'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent:before,'+
+    'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent:after{'
+    'background:transparent!important;background-image:none!important;backdrop-filter:none!important;'
+    '-webkit-backdrop-filter:none!important;border-color:transparent!important;box-shadow:none!important}'
+    '.router-card.login-card.h5000m-wallpaper-transparent:before,'+
+    '.router-card.login-card.h5000m-wallpaper-transparent:after,'+
+    '.h5000m-wallpaper-active .login-glow{display:none!important}\';'
+    'document.head.append(styleTag)}if(activeCard&&activeCard!==card)activeCard.classList.remove("h5000m-wallpaper-transparent");'
+    'activeCard=card;card.classList.add("h5000m-wallpaper-transparent");page?.classList.add("h5000m-wallpaper-active")};q();'
+    'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-theme"]})})()'
 )
 mounted_replacement = (
     'x.query.changed==="1"&&(m.value=!1,s.value="密码已修改，请使用新密码登录"),'
@@ -65,13 +70,14 @@ else:
 
 root_anchor = 'i("div",Y,[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
 root_replacement = (
-    'i("div",{...Y,style:wallpaper.value?{backgroundImage:`linear-gradient('
-    'rgba(15,23,42,.46),rgba(15,23,42,.62)),url("${wallpaper.value}")`,'
+    'i("div",{...Y,style:wallpaper.value?{backgroundImage:`url("${wallpaper.value}")`,'
     'backgroundSize:"cover",backgroundPosition:"center"}:void 0},'
     '[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
 )
 if login.count(root_anchor) == 1:
     login = login.replace(root_anchor, root_replacement, 1)
+elif 'backgroundImage:`linear-gradient(rgba(15,23,42,.46),rgba(15,23,42,.62)),url("${wallpaper.value}")`' in login:
+    login = login.replace('backgroundImage:`linear-gradient(rgba(15,23,42,.46),rgba(15,23,42,.62)),url("${wallpaper.value}")`', 'backgroundImage:`url("${wallpaper.value}")`', 1)
 elif 'wallpaper.value?{backgroundImage:' not in login:
     raise SystemExit("ERROR: HigoOS login root element changed")
 image_anchor = ',[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
@@ -196,8 +202,8 @@ native_path.write_text(native, encoding="utf-8")
 
 for marker, content in (
     ("new Image()", login),
-    ('card.style.setProperty("background-color","transparent","important")', login),
-    ("if(activeCard&&originalStyles)", login),
+    ('h5000m-wallpaper-transparent', login),
+    ('backgroundImage:`url("${wallpaper.value}")`', login),
     ("higoos-login-wallpaper.", login),
     ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),

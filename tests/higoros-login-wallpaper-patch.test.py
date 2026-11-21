@@ -46,11 +46,12 @@ with tempfile.TemporaryDirectory() as temporary:
         'wallpaper.value?{backgroundImage:',
         'backgroundSize:"cover"',
         'wallpaper.value?i("img",{src:wallpaper.value',
-        'card.style.setProperty("background-color","transparent","important")',
-        'input[type="password"]',
+        'h5000m-wallpaper-transparent',
         'new MutationObserver(q)',
-        'style.setProperty("backdrop-filter","none","important")',
-        "if(activeCard&&originalStyles)",
+        'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent',
+        'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent',
+        'if(!wallpaper.value){activeCard?.classList.remove("h5000m-wallpaper-transparent")',
+        'backgroundImage:`url("${wallpaper.value}")`',
     )
     required_native = (
         'localStorage.setItem(key,prefix+encodeURIComponent(selected.name))',
@@ -65,8 +66,9 @@ with tempfile.TemporaryDirectory() as temporary:
         '背景文件已保存，但同步到 HigoOS 登录页失败',
         'Z(t(s).data.value.files.filter(b=>!b.name.startsWith("higoos-login-wallpaper."))',
     )
-    if any(marker not in login_source for marker in required_login):
-        raise SystemExit("ERROR: login page does not apply a safe local wallpaper URL")
+    missing_login = [marker for marker in required_login if marker not in login_source]
+    if missing_login:
+        raise SystemExit(f"ERROR: login page wallpaper integration is missing {missing_login!r}")
     if any(marker not in native_source for marker in required_native):
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
     if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 1:
