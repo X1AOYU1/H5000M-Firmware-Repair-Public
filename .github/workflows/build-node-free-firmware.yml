@@ -88,8 +88,9 @@ jobs:
           AUDIT_DIR: ${{ runner.temp }}/higoos-openclash-audit
         run: |
           mkdir -p "$AUDIT_DIR"
+          sudo install -m 0644 output/final-root/usr/lib/lua/luci/view/openclash/status.htm "$AUDIT_DIR/native-status.htm"
           set +e
-          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
+          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" "$AUDIT_DIR/native-status.htm" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
           result=$?
           if [ ! -f "$AUDIT_DIR/openclash-entry-browser.txt" ]; then
             cp "$AUDIT_DIR/openclash-entry-browser-process.log" "$AUDIT_DIR/openclash-entry-browser.txt"

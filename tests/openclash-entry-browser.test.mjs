@@ -16,7 +16,7 @@ const luciPath = "/cgi-bin/luci/admin/services/openclash";
 const luciRequests = [];
 const signins = [];
 const fixturePassword = "browser-audit-password";
-const nativeTemplate = await readFile(resolve(root, "../../../lib/lua/luci/view/openclash/status.htm"), "utf8");
+const nativeTemplate = await readFile(process.argv[4] ?? resolve(root, "../../../lib/lua/luci/view/openclash/status.htm"), "utf8");
 const statusMarkup = nativeTemplate
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
   .replace(/<%:([\s\S]*?)%>/g, "$1")
