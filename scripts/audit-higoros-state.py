@@ -14,6 +14,12 @@ password_hash = subprocess.check_output(['openssl', 'passwd', '-6', 'synthetic-a
 (root / 'etc/shadow').write_text('root:' + password_hash + ':19000:0:99999:7:::\n')
 env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='error')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
+(root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
+services = []
+for binary in ['/sbin/ubusd', '/sbin/rpcd']:
+    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    time.sleep(1)
+print('ubusd/rpcd running:', [p.poll() is None for p in services])
 proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 try:
     ready=False
@@ -45,6 +51,7 @@ try:
     p=state/'devices-state.json'
     print('synthetic state JSON keys:', list(json.loads(p.read_text()).keys()))
 finally:
+    for service in services: service.terminate()
     proc.terminate()
     try: proc.wait(timeout=5)
     except subprocess.TimeoutExpired: proc.kill(); proc.wait()
