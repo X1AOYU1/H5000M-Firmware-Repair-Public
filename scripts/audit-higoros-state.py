@@ -4,6 +4,8 @@ import json, os, pathlib, shutil, subprocess, sys, time, urllib.error, urllib.re
 root = pathlib.Path(sys.argv[1]).resolve()
 state = root / "tmp/higoros-audit-state"
 runtime = root / "tmp/higoros-audit-runtime"
+(root / 'tmp/sysinfo').mkdir(parents=True, exist_ok=True)
+(root / 'tmp/sysinfo/board_name').write_text('hiveton,h5000m\n')
 state.mkdir(parents=True, exist_ok=True)
 runtime.mkdir(parents=True, exist_ok=True)
 shutil.copy2('/usr/bin/qemu-aarch64-static', root / 'usr/bin/qemu-aarch64-static')
