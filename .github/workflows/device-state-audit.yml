@@ -1,0 +1,25 @@
+name: Isolated HigoOS device state audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools python3-cryptography qemu-user-static
+      - name: Extract encrypted baseline in runner
+        env:
+          FULL_REPAIR_BASE_KEY: ${{ secrets.FULL_REPAIR_BASE_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/input" "$RUNNER_TEMP/extract"
+          curl -fsSL --retry 4 "https://github.com/${GITHUB_REPOSITORY}/releases/download/full-repair-baseline-encrypted-2026-11-19/H5000M-full-repair-baseline.aesgcm" -o "$RUNNER_TEMP/input/base.aesgcm"
+          echo '5c302300b037899abd57e277ade0f9165d9741e05a327ab179caa45ac5881bf3  '"$RUNNER_TEMP/input/base.aesgcm" | sha256sum -c -
+          python3 scripts/decrypt-private-baseline.py "$RUNNER_TEMP/input/base.aesgcm" "$RUNNER_TEMP/input/base.bin" "$FULL_REPAIR_BASE_KEY"
+          tar -xf "$RUNNER_TEMP/input/base.bin" -C "$RUNNER_TEMP/extract"
+          ROOT_IMAGE=$(find "$RUNNER_TEMP/extract" -type f -name root -print -quit)
+          sudo unsquashfs -no-progress -d "$RUNNER_TEMP/rootfs" "$ROOT_IMAGE" >/dev/null
+      - name: Run isolated synthetic audit
+        run: sudo unshare --net python3 scripts/audit-higoros-state.py "$RUNNER_TEMP/rootfs"
