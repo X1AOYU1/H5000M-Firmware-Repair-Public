@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+const source = await readFile("scripts/higoos-device-vendor.js", "utf8");
+const { findVendor } = await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
+const fixture = { "001122": "24-bit", "0011223": "28-bit", "001122334": "36-bit" };
+assert.equal(findVendor("00:11:22:33:44:55", fixture), "36-bit");
+assert.equal(findVendor("00:11:22:3f:44:55", fixture), "28-bit");
+assert.equal(findVendor("00:11:22:ff:44:55", fixture), "24-bit");
+assert.equal(findVendor("02:11:22:33:44:55", fixture), "");
+assert.equal(findVendor("01:11:22:33:44:55", fixture), "");
+assert.equal(findVendor("invalid", fixture), "");
+const vendors = JSON.parse(await readFile("scripts/higoos-ieee-vendors.json", "utf8"));
+assert.ok(Object.keys(vendors).length > 50000);
+console.log("PASS: longest IEEE prefix and randomized MAC filtering");

@@ -22,17 +22,30 @@ def patch(root: Path) -> None:
         for old, new in edits:
             body = body.replace(old, new, 1)
         page.write_text('import{createDeviceRemark}from"./higoos-device-remarks.js";' + body, encoding="utf-8")
-    elif not (body.count('const h5000mDeviceRemark=createDeviceRemark({defineComponent:Z,h:Be,ref:M,Modal:N,Button:V,Input:X})') == 1 and body.count(edits[1][1]) == 1):
+    elif not (body.count('const h5000mDeviceRemark=createDeviceRemark({defineComponent:Z,h:Be,ref:M,Modal:N,Button:V,Input:X})') == 1 and body.count('r(h5000mDeviceRemark,{mac:t.macAddress,name:t.name},null,8,["mac","name"])') == 1):
         raise SystemExit("ERROR: HigoOS device card anchors changed")
+
+    body = page.read_text(encoding="utf-8")
+    vendor_setup = 'const h5000mDeviceVendor=createDeviceVendor({defineComponent:Z,h:Be,ref:M});'
+    vendor_card = 'r(h5000mDeviceVendor,{mac:t.macAddress},null,8,["mac"])'
+    if vendor_setup not in body:
+        anchor = 'setup(l,{emit:g}){const h5000mDeviceRemark='
+        if anchor not in body:
+            anchor = 'setup(l,{emit:g}){const h5000mLanLink=createLanLink(Be);const h5000mDeviceRemark='
+        card = 'e("p",zs,o(t.macAddress),1)'
+        if body.count(anchor) != 1 or body.count(card) != 1:
+            raise SystemExit("ERROR: device vendor card anchors changed")
+        body = 'import{createDeviceVendor}from"./higoos-device-vendor.js";' + body.replace(anchor, anchor.replace('const h5000mDeviceRemark=', vendor_setup + 'const h5000mDeviceRemark='), 1).replace(card, card + ',' + vendor_card, 1)
+        page.write_text(body, encoding="utf-8")
 
     body = page.read_text(encoding="utf-8")
     link_setup = 'const h5000mLanLink=createLanLink(Be);'
     if link_setup not in body:
-        anchor = 'setup(l,{emit:g}){const h5000mDeviceRemark='
+        anchor = 'setup(l,{emit:g}){' + vendor_setup + 'const h5000mDeviceRemark='
         rate = 'e("span",Ks,o(s(at)(t.connectionDetail)),1)'
         if body.count(anchor) != 1 or body.count(rate) != 1:
             raise SystemExit("ERROR: HigoOS LAN link card anchors changed")
-        body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + 'const h5000mDeviceRemark=', 1)
+        body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + vendor_setup + 'const h5000mDeviceRemark=', 1)
         body = body.replace(rate, 'r(h5000mLanLink,{device:t,fallback:s(at)(t.connectionDetail)},null,8,["device","fallback"])', 1)
         page.write_text('import{createLanLink}from"./higoos-lan-link.js";' + body, encoding="utf-8")
 
@@ -83,6 +96,8 @@ def patch(root: Path) -> None:
     files = {
         assets / "higoos-lan-link.js": (sources / "higoos-lan-link.js").read_text(encoding="utf-8"),
         assets / "higoos-device-type.js": (sources / "higoos-device-type.js").read_text(encoding="utf-8"),
+        assets / "higoos-device-vendor.js": (sources / "higoos-device-vendor.js").read_text(encoding="utf-8"),
+        assets / "higoos-ieee-vendors.json": (sources / "higoos-ieee-vendors.json").read_text(encoding="utf-8"),
         assets / "higoos-device-remarks.js": (sources / "higoos-device-remarks.js").read_text(encoding="utf-8"),
         root / "lib/upgrade/keep.d/higoos-device-remarks": "/etc/higoos-device-remarks/\n",
     }

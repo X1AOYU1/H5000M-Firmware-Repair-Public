@@ -52,6 +52,8 @@ jobs:
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
         run: node tests/higoos-wallpaper-crop-browser.test.mjs
+      - name: Test device vendor lookup
+        run: node tests/higoos-device-vendor.test.mjs
       - name: Test OpenClash node cleanup
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
