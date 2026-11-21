@@ -62,7 +62,7 @@ for args in [['list'], ['call', 'network.interface.lan', 'status']]:
             if any(term in line for term in ('qemu-aarch64', 'netifd', 'wireless', 'mac80211', 'audit-higoros')):
                 print('process diagnostic:', line[:300])
 daemon_log = open(root / 'tmp/higoros-audit-daemon.log', 'w+')
-proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=daemon_log)
+proc = subprocess.Popen(['strace', '-f', '-qq', '-e', 'trace=execve,openat,newfstatat,statx', '-o', str(root / 'tmp/audit-strace.log'), 'chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=daemon_log)
 try:
     ready=False
     for _ in range(30):
@@ -109,3 +109,8 @@ finally:
     proc.terminate()
     try: proc.wait(timeout=5)
     except subprocess.TimeoutExpired: proc.kill(); proc.wait()
+    trace = root / 'tmp/audit-strace.log'
+    if trace.exists():
+        lines = trace.read_text(errors='replace').splitlines()
+        print('trace missing paths (last 100):')
+        for line in [x for x in lines if 'ENOENT' in x][-100:]: print(line[:350])
