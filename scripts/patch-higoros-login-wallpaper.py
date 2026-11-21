@@ -46,6 +46,13 @@ login_probe = (
     '.router-card.login-card.h5000m-wallpaper-transparent:before,'+
     '.router-card.login-card.h5000m-wallpaper-transparent:after,'+
     '.h5000m-wallpaper-active .login-glow{display:none!important}\';'
+    'styleTag.textContent+=\' .h5000m-wallpaper-active .text-txt-1,'+
+    '.h5000m-wallpaper-active .text-txt-2,.h5000m-wallpaper-active .text-txt-4{color:#fff!important;'+
+    'text-shadow:0 1px 4px #000,0 0 8px #000}'+
+    '.h5000m-wallpaper-active .login-input{background:rgba(15,23,42,.68)!important;'+
+    'color:#fff!important;border-color:rgba(255,255,255,.35)!important;text-shadow:none}'+
+    '.h5000m-wallpaper-active .login-input::placeholder{color:#d1d5db!important;opacity:1}'+
+    '.h5000m-wallpaper-active .login-input:focus{outline:2px solid #fff!important;outline-offset:2px}\';'
     'document.head.append(styleTag)}if(activeCard&&activeCard!==card)activeCard.classList.remove("h5000m-wallpaper-transparent");'
     'activeCard=card;card.classList.add("h5000m-wallpaper-transparent");page?.classList.add("h5000m-wallpaper-active")};q();'
     'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-theme"]})})()'

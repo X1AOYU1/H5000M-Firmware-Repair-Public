@@ -72,11 +72,11 @@ export function createDeviceRemark({ defineComponent, h, ref, Modal, Button, Inp
       }
 
       return () => key() ? h("div", { class: "mt-1 flex min-w-0 items-baseline gap-1 text-sm" }, [
+        notes.value[key()] ? h("p", { class: "min-w-0 text-txt-3 break-all" }, notes.value[key()]) : null,
         h("button", {
           type: "button", class: "shrink-0 p-1 -ml-1 rounded text-brand-txt hover:underline focus-visible:outline",
           "aria-label": `备注：${props.name ?? props.mac}`, onClick: open,
         }, "备注"),
-        notes.value[key()] ? h("p", { class: "min-w-0 text-txt-3 break-all" }, notes.value[key()]) : null,
         show.value ? h(Modal, { modelValue: true, "onUpdate:modelValue": setOpen, title: "设备备注", size: "sm" }, {
           default: () => [
             h("p", { class: "mb-2 break-all text-sm text-txt-3" }, props.name ?? props.mac),
