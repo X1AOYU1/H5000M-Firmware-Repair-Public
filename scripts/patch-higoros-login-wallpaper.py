@@ -49,8 +49,8 @@ login_probe = (
     'styleTag.textContent+=\' .h5000m-wallpaper-active .text-txt-1,'+
     '.h5000m-wallpaper-active .text-txt-2,.h5000m-wallpaper-active .text-txt-4{color:#fff!important;'+
     'text-shadow:0 1px 2px #000b}'+
-    '.h5000m-wallpaper-active .login-input{background:rgba(15,23,42,.68)!important;'+
-    'color:#fff!important;border-color:rgba(255,255,255,.35)!important;text-shadow:none}'+
+    '.h5000m-wallpaper-active .login-input{background:transparent!important;'+
+    'color:#fff!important;border-color:rgba(255,255,255,.55)!important;text-shadow:0 1px 3px #000,0 0 5px #000!important}'+
     'html[data-theme="light"] .h5000m-wallpaper-active .login-input{background:transparent!important;'+
     'text-shadow:0 1px 3px #000,0 0 5px #000!important}'+
     '.h5000m-wallpaper-active .login-input::placeholder{color:#d1d5db!important;opacity:1}'+
