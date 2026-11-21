@@ -137,6 +137,10 @@ def patch(root: Path) -> None:
     for path, contents in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents, encoding="utf-8")
+    logo_dir = assets / "device-logos"
+    logo_dir.mkdir(exist_ok=True)
+    for logo in (sources / "device-logos").glob("*.svg"):
+        (logo_dir / logo.name).write_bytes(logo.read_bytes())
     print("PASS: installed independent HigoOS device remarks")
 
 

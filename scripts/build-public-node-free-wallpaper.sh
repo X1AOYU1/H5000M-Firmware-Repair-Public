@@ -24,6 +24,7 @@ python3 scripts/patch-openclash-meta-core-link.py "$OUT/rootfs" | tee "$OUT/open
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
 python3 scripts/patch-higoros-device-remarks.py "$OUT/rootfs"
 python3 scripts/patch-higoros-uplink-security.py "$OUT/rootfs"
+python3 scripts/patch-higoros-dashboard-refresh.py "$OUT/rootfs"
 python3 scripts/revision-higoros-web-assets.py "$OUT/rootfs" | tee "$OUT/frontend-asset-revision.txt"
 
 python3 - "$OUT/rootfs" <<'PY'

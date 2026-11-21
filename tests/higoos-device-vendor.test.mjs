@@ -30,7 +30,7 @@ assert.equal(brandFromDeviceName('Yu-de-S24-Ultra'), 'Samsung');
 assert.equal(brandFromDeviceName('unknown device'), '');
 const avatar = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, attrs, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
-assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text, 'HUAWEI');
+assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text[0].attrs.src, '/assets/device-logos/huawei.svg');
 assert.equal(avatar.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'})().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: recognized brands get avatars, randomized addresses retain device icon');
 
@@ -49,7 +49,7 @@ const render = interactive.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'
 render().text[0].attrs.onClick();
 await render().text[1].text[1].text[1].attrs.onClick();
 assert.equal(saved.c6ac9ff69422, 'Samsung');
-assert.equal(render().text[0].text[0].text, 'Samsung');
+assert.equal(render().text[0].text[0].text[0].attrs.src, '/assets/device-logos/samsung.svg');
 render().text[0].attrs.onClick();
 await render().text[1].text[1].text[0].attrs.onClick();
 assert.equal(render().text[0].text[0].attrs.src, 'device.svg');

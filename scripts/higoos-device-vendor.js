@@ -36,6 +36,11 @@ export function createDeviceVendor({defineComponent, h, ref}) {
     return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'break-all'}, `厂商：${vendor}`) : null; };
   }});
 }
+export function brandLogo(brand) {
+  const logos = {apple:'apple', samsung:'samsung', huawei:'huawei', xiaomi:'xiaomi', oppo:'oppo', vivo:'vivo', honor:'honor', lenovo:'lenovo', asus:'asus', dell:'dell', hp:'hp', google:'google', 'tp-link':'tplink'};
+  const slug = logos[(brand || '').toLowerCase()];
+  return slug ? `/assets/device-logos/${slug}.svg` : '';
+}
 export function createDeviceAvatar({defineComponent, h, ref}) {
   const vendors = ref(null);
   const choices = ref({});
@@ -67,9 +72,10 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
     }
     return () => {
       const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value))) || brandFromDeviceName(props.name);
-      const image = brand
-        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'50px',height:'50px',borderRadius:'10px',fontSize:brand.length > 7 ? '9px' : '11px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
-        : h('img', {src:props.fallback, alt:'', class:'w-6 h-6 object-contain'});
+      const logo = brandLogo(brand);
+      const image = logo ? h('span', {title:brand,style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',background:'rgba(0,123,196,.08)'}}, [h('img',{src:logo,alt:brand,style:{width:'80%',height:'80%',objectFit:'contain'}})]) : brand
+        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',fontSize:brand.length > 7 ? '12px' : brand.length > 4 ? '14px' : '17px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
+        : h('img', {src:props.fallback, alt:'', class:'w-9 h-9 object-contain'});
       return h('div', {style:{position:'relative'}}, [
         h('button', {type:'button', title:'选择设备头像', 'aria-label':'选择设备头像', onClick:()=>{show.value=!show.value;error.value='';}}, [image]),
         show.value ? h('div', {role:'dialog','aria-label':'选择设备头像',style:{position:'absolute',top:'calc(100% + 8px)',left:'0',zIndex:'50',width:'220px',padding:'12px',borderRadius:'12px',background:'var(--bg-1, #fff)',color:'var(--text-1, #1f2937)',boxShadow:'0 8px 24px rgba(0,0,0,.2)',border:'1px solid var(--line-1, #e5e7eb)'}}, [
