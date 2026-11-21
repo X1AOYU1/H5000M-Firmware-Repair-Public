@@ -76,6 +76,10 @@ jobs:
       - name: Isolated synthetic HigoOS persistence audit
         continue-on-error: true
         run: sudo unshare --net python3 scripts/audit-higoros-state.py output/final-root
+      - name: Test wireless scan security mapping
+        run: |
+          node scripts/test-uplink-security.mjs
+          node --check output/final-root/usr/share/higoros/web/assets/WirelessShellPage-*.js
       - name: Inspect wireless repeater password controls
         run: |
           python3 - <<'PY'
