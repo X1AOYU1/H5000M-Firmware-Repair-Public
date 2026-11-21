@@ -23,15 +23,17 @@ fixture = {
 }
 with tempfile.TemporaryDirectory(prefix="h5000m-restore-") as temp:
     base = Path(temp)
-    busybox = shlex.join(["qemu-aarch64-static", "-L", str(root), str(root / "bin/busybox"), "tar"])
+    busybox = shlex.join(["qemu-aarch64-static", "-L", str(root), str(root / "bin/busybox")])
     setup = r'''
-local base, tar = arg[2], arg[3]
+local base, busybox = arg[2], arg[3]
 local UTIL = { shellquote = function(s) return "'" .. s:gsub("'", "'\\''") .. "'" end }
 local function sandbox(command)
     command = command:gsub("/etc/openclash", base .. "/etc/openclash")
     command = command:gsub("/etc/config/openclash", base .. "/etc/config/openclash")
     command = command:gsub("/tmp/oc_restore", base .. "/oc_restore")
-    return command:gsub("^tar ", tar .. " ")
+    return command:gsub("^tar ", busybox .. " tar ")
+        :gsub("^find ", busybox .. " find ")
+        :gsub(" && cmp ", " && " .. busybox .. " cmp ")
 end
 local SYS = {}
 function SYS.call(command)
@@ -92,3 +94,23 @@ end
         (config / "127.0.0.1.yaml").mkdir()
         subprocess.run(["lua5.1", str(test), str(backup), str(case), busybox, "fail"], check=True)
         print(f"PASS: packed ARM64 BusyBox restored both YAML profiles from .{extension}; a failed write cannot report success")
+
+    settings = (root / "usr/lib/lua/luci/model/cbi/openclash/settings.lua").read_text(encoding="utf-8")
+    for mode in ("ipdb", "geoip", "geosite", "geoasn", "chnroute"):
+        command = "openclash_chnroute.sh" if mode == "chnroute" else f"openclash_geo.sh {mode}"
+        queue = f'/usr/share/openclash/{command} >/dev/null 2>&1 &'
+        call = settings.index(f'SYS.call("{queue}")')
+        callback = settings[settings.rindex("o.write = function()", 0, call):settings.index("\nend", call) + 4]
+        test.write_text(r'''
+local o, queued, destination = {}, nil, nil
+local m = {uci = {set = function() end, commit = function() end}}
+local SYS = { call = function(command) queued = command; return 0 end }
+local DISP = { build_url = function(...) return table.concat({...}, "/") end }
+local HTTP = { redirect = function(path) destination = path end }
+''' + callback + r'''
+o.write()
+assert(queued == arg[1], "requested database updater was not started")
+assert(destination == "admin/services/openclash/settings", "update left plugin settings")
+''', encoding="utf-8")
+        subprocess.run(["lua5.1", str(test), queue], check=True)
+    print("PASS: all GEO and China route update buttons launch their updater and return to the native settings page")

@@ -42,6 +42,22 @@ def patch_backup(root: Path, views: Path):
             view.write_text(body + "\n" + tag, encoding="utf-8")
 
 
+def patch_update_return(root: Path):
+    model = root / "usr/lib/lua/luci/model/cbi/openclash/settings.lua"
+    source = model.read_text(encoding="utf-8")
+    redirect = 'HTTP.redirect(DISP.build_url("admin", "services", "openclash"))'
+    stay = 'HTTP.redirect(DISP.build_url("admin", "services", "openclash", "settings"))'
+    for command in (*(f"openclash_geo.sh {name}" for name in ("ipdb", "geoip", "geosite", "geoasn")), "openclash_chnroute.sh"):
+        queue = f'SYS.call("/usr/share/openclash/{command} >/dev/null 2>&1 &")'
+        anchor = queue + "\n\t" + redirect
+        updated = queue + "\n\t" + stay
+        if source.count(anchor) == 1:
+            source = source.replace(anchor, updated, 1)
+        elif source.count(updated) != 1:
+            raise SystemExit(f"ERROR: native OpenClash update action changed: {command}")
+    model.write_text(source, encoding="utf-8")
+
+
 def patch(root: Path):
     web = root / "usr/share/higoros/web"
     assets = web / "assets"
@@ -107,6 +123,8 @@ def patch(root: Path):
     if not all(f'data-openclash-style="{name}"' in status for name in ("oc-common.css", "oc-client.css")):
         raise SystemExit("ERROR: native OpenClash status styles are missing")
     patch_backup(root, views)
+    patch_update_return(root)
+    print("PASS: native GEO and China route updates return to the settings page")
     print("PASS: native OpenClash backup forms use the authenticated LuCI chunk upload route")
     print("PASS: LuCI authenticates through its normal login and native OpenClash ships its page styles")
 

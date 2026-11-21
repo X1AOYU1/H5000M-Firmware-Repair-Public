@@ -279,7 +279,7 @@ try {
 
   // Retain the configuration-tab regression check for direct visits to the older URL.
   await page.goto(`${baseUrl}/apps/openclash`, { waitUntil: "domcontentloaded" });
-  await page.getByText("基本设置", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+  await page.getByRole("button", { name: "基本设置", exact: true }).waitFor({ state: "visible", timeout: 10_000 });
   await page.getByText("配置文件", { exact: true }).click();
   const operation = page.locator("#oc-backup-file-type");
   await operation.waitFor({ state: "visible", timeout: 5_000 });

@@ -199,8 +199,8 @@ replacement = r'''function restore_backup(archive)
 					end
 				end
 				if not selected or not selected:match("^[%w_.%-]+%.ya?ml$") or SYS.call("test -f " .. UTIL.shellquote(config_dir .. "/" .. selected)) ~= 0 then
-					selected = SYS.exec("find " .. UTIL.shellquote(config_dir) .. " -maxdepth 1 -type f \\( -name '*.yaml' -o -name '*.yml' \\) -print -quit")
-					selected = selected and selected:match("([^/]+)\n?$")
+					table.sort(profiles)
+					selected = profiles[1]
 				end
 				if selected and selected:match("^[%w_.%-]+%.ya?ml$") then
 					local ok = SYS.call("mkdir -p /etc/openclash/config /etc/openclash/custom /etc/openclash/overwrite /etc/openclash/proxy_provider /etc/openclash/rule_provider") == 0
@@ -210,7 +210,7 @@ replacement = r'''function restore_backup(archive)
 						local name = directories[index]
 						local src = stage .. "/" .. name
 						local dest = "/etc/openclash/" .. name
-						if SYS.call("test -d " .. UTIL.shellquote(src)) == 0 and SYS.call("find " .. UTIL.shellquote(src) .. " -type f -print -quit | grep -q .") == 0 then
+						if SYS.call("test -d " .. UTIL.shellquote(src)) == 0 then
 							ok = ok and SYS.call("cp -f " .. UTIL.shellquote(src) .. "/* " .. UTIL.shellquote(dest .. "/")) == 0
 						end
 					end
