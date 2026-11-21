@@ -23,11 +23,11 @@ for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
     if not device.exists():
         os.mknod(device, 0o20666, os.makedev(1, minor))
 services = []
-for binary in ['/sbin/ubusd', '/sbin/rpcd']:
+for binary in ['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd']:
     services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
     time.sleep(1)
-print('ubusd/rpcd running:', [p.poll() is None for p in services])
-for name, service in zip(['/sbin/ubusd', '/sbin/rpcd'], services):
+print('ubusd/rpcd/netifd running:', [p.poll() is None for p in services])
+for name, service in zip(['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd'], services):
     if service.poll() is not None:
         print('service diagnostic:', name, service.returncode, service.stderr.read().decode('utf-8', 'replace')[:2000])
 daemon_log = open(root / 'tmp/higoros-audit-daemon.log', 'w+')
