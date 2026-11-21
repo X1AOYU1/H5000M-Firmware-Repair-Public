@@ -77,7 +77,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
             h('span', {}, '选择设备头像'), h('button',{type:'button','aria-label':'关闭',onClick:()=>{show.value=false;},style:{border:'0',background:'transparent',color:'inherit',fontSize:'18px',cursor:'pointer'}},'×')
           ]),
           h('div', {style:{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:'6px',maxHeight:'230px',overflowY:'auto'}}, [
-            ...[['','自动识别'], ...['Samsung','Huawei','Apple','Xiaomi','OPPO','vivo','Honor','Lenovo','ASUS','Dell','HP','Computer','Phone','Tablet','TV'].map(name=>[name,name])].map(([value,label])=>h('button',{type:'button',disabled:busy.value,onClick:()=>save(value),style:{padding:'7px 3px',border:'1px solid var(--line-1, #e5e7eb)',borderRadius:'7px',background:(choices.value[key()] || '')===value?'rgba(0,123,196,.16)':'transparent',color:'inherit',fontSize:'12px',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis'}},label))
+            ...[['','自动识别'], ...Object.entries({Samsung:'三星',Huawei:'华为',Apple:'苹果',Xiaomi:'小米',OPPO:'OPPO',vivo:'vivo',Honor:'荣耀',Lenovo:'联想',ASUS:'华硕',Dell:'戴尔',HP:'惠普',Computer:'电脑',Phone:'手机',Tablet:'平板',TV:'电视'})].map(([value,label])=>h('button',{type:'button',disabled:busy.value,onClick:()=>save(value),style:{padding:'7px 3px',border:'1px solid var(--line-1, #e5e7eb)',borderRadius:'7px',background:(choices.value[key()] || '')===value?'rgba(0,123,196,.16)':'transparent',color:'inherit',fontSize:'12px',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis'}},label))
           ]), error.value ? h('p', {role:'alert',style:{color:'#dc2626',fontSize:'12px'}}, error.value) : null
         ]) : null
       ]);
