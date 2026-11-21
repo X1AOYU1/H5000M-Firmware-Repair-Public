@@ -28,7 +28,8 @@ print('ubusd/rpcd running:', [p.poll() is None for p in services])
 for name, service in zip(['/sbin/ubusd', '/sbin/rpcd'], services):
     if service.poll() is not None:
         print('service diagnostic:', name, service.returncode, service.stderr.read().decode('utf-8', 'replace')[:2000])
-proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+daemon_log = open(root / 'tmp/higoros-audit-daemon.log', 'w+')
+proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=daemon_log)
 try:
     ready=False
     for _ in range(30):
@@ -38,7 +39,7 @@ try:
         except Exception: time.sleep(1)
     print('daemon running:', proc.poll() is None, 'listener ready:', ready)
     if not ready:
-        errors = (proc.stderr.read() if proc.poll() is not None else b'').decode('utf-8', 'replace')
+        daemon_log.flush(); daemon_log.seek(0); errors = daemon_log.read()
         for line in errors.splitlines():
             if any(term in line.lower() for term in ('error', 'failed', 'missing', 'not found', 'panic', 'qemu')):
                 print('startup diagnostic:', line[:300])
@@ -46,7 +47,7 @@ try:
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     login = urllib.request.Request('http://127.0.0.1:18080/api/v1/auth/login', data=json.dumps({'username':'root','password':'synthetic-audit-only'}).encode(), headers={'Content-Type':'application/json'}, method='POST')
     try:
-        with opener.open(login, timeout=5) as response: print('synthetic login:', response.status, response.read(1000).decode('utf-8', 'replace'))
+        with opener.open(login, timeout=5) as response: print('synthetic login:', response.status); response.read()
     except urllib.error.HTTPError as e: print('synthetic login failed:', e.code, e.read(1000).decode('utf-8', 'replace')); sys.exit(1)
     for method, path in [('GET','/api/v1/devices'), ('DELETE','/api/v1/devices/00:11:22:33:44:55')]:
         req=urllib.request.Request('http://127.0.0.1:18080'+path, method=method)
@@ -59,6 +60,9 @@ try:
     p=state/'devices-state.json'
     print('synthetic state JSON keys:', list(json.loads(p.read_text()).keys()))
 finally:
+    daemon_log.flush(); daemon_log.seek(0)
+    print('daemon diagnostics:', daemon_log.read()[-8000:])
+    daemon_log.close()
     for service in services: service.terminate()
     proc.terminate()
     try: proc.wait(timeout=5)
