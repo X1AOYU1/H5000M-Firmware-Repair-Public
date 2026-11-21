@@ -46,8 +46,17 @@ def patch(root: Path) -> None:
             raise SystemExit("ERROR: HigoOS device avatar anchors changed")
         body = body.replace('import{createDeviceVendor}from', 'import{createDeviceVendor,createDeviceAvatar}from', 1)
         body = body.replace(vendor_setup, vendor_setup + avatar_setup, 1)
-        body = body.replace(avatar, 'r(h5000mDeviceAvatar,{mac:t.macAddress,fallback:s(de)(t.osType)},null,8,["mac","fallback"])', 1)
+        body = body.replace(avatar, 'r(h5000mDeviceAvatar,{mac:t.macAddress,name:t.name,fallback:s(de)(t.osType)},null,8,["mac","name","fallback"])', 1)
         page.write_text(body, encoding="utf-8")
+
+    body = page.read_text(encoding="utf-8")
+    old_avatar = 'r(h5000mDeviceAvatar,{mac:t.macAddress,fallback:s(de)(t.osType)},null,8,["mac","fallback"])'
+    new_avatar = 'r(h5000mDeviceAvatar,{mac:t.macAddress,name:t.name,fallback:s(de)(t.osType)},null,8,["mac","name","fallback"])'
+    if old_avatar in body:
+        body = body.replace(old_avatar, new_avatar, 1)
+        page.write_text(body, encoding="utf-8")
+    elif body.count(new_avatar) != 1:
+        raise SystemExit("ERROR: HigoOS device avatar name anchor changed")
 
     body = page.read_text(encoding="utf-8")
     avatar_box = 'Ps={class:"w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-bg-1/60 border border-line-1/70"}'

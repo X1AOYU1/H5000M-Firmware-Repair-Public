@@ -17,6 +17,14 @@ export function vendorBrand(vendor) {
   ];
   return brands.find(([pattern]) => pattern.test(name))?.[1] || '';
 }
+export function brandFromDeviceName(name) {
+  const value = (name || '').trim();
+  if (/\biphone\b|\bipad\b/i.test(value)) return 'Apple';
+  if (/\bsamsung\b|\bgalaxy\b|(?:^|[^a-z0-9])s(?:2[0-9]|1[0-9])(?:[-_ ]?(?:ultra|plus|fe|\+))?(?:$|[^a-z0-9])/i.test(value)) return 'Samsung';
+  if (/\bhuawei\b|\b(?:mate|pura)[-_ ]?\d+/i.test(value)) return 'Huawei';
+  if (/\bxiaomi\b|\bredmi\b/i.test(value)) return 'Xiaomi';
+  return '';
+}
 export function createDeviceVendor({defineComponent, h, ref}) {
   const vendors = ref(null);
   database ??= fetch('/assets/higoos-ieee-vendors.json', {cache:'force-cache'}).then(r => {
@@ -42,7 +50,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
   }
   load().catch(() => {});
   database.then(value => { vendors.value = value; }).catch(() => {});
-  return defineComponent({name:'HigoosDeviceAvatar', props:{mac:String, fallback:String}, setup(props) {
+  return defineComponent({name:'HigoosDeviceAvatar', props:{mac:String, name:String, fallback:String}, setup(props) {
     const show = ref(false), busy = ref(false), error = ref('');
     const key = () => (props.mac || '').replace(/[:-]/g, '').toLowerCase();
     async function save(event) {
@@ -59,7 +67,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
       finally { busy.value = false; }
     }
     return () => {
-      const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value)));
+      const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value))) || brandFromDeviceName(props.name);
       const image = brand
         ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'50px',height:'50px',borderRadius:'10px',fontSize:brand.length > 7 ? '9px' : '11px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
         : h('img', {src:props.fallback, alt:'', class:'w-6 h-6 object-contain'});

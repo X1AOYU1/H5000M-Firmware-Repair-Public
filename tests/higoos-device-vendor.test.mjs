@@ -15,7 +15,7 @@ console.log("PASS: longest IEEE prefix and randomized MAC filtering");
 
 let requested = '';
 globalThis.fetch = async url => { if (url.includes('ieee-vendors')) { requested = url; return {ok:true, json: async () => ({'E00630':'HUAWEI TECHNOLOGIES CO.,LTD'})}; } return {ok:true,json:async()=>({token:'test',avatars:{}})}; };
-const { createDeviceVendor, createDeviceAvatar, vendorBrand } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createDeviceVendor, createDeviceAvatar, vendorBrand, brandFromDeviceName } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const component = createDeviceVendor({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
 const renderOffline = component.setup({mac:'E0:06:30:12:34:56', online:false});
@@ -25,6 +25,9 @@ assert.equal(component.setup({mac:'02:11:22:33:44:55', online:false})(), null);
 console.log('PASS: offline device vendor renders with database; randomized MAC is not misidentified');
 assert.equal(vendorBrand('EliteGroup Computer Systems Co., LTD'), 'ECS');
 assert.equal(vendorBrand('Unknown manufacturer'), '');
+assert.equal(brandFromDeviceName('iPhone'), 'Apple');
+assert.equal(brandFromDeviceName('Yu-de-S24-Ultra'), 'Samsung');
+assert.equal(brandFromDeviceName('unknown device'), '');
 const avatar = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, attrs, text}), ref:value=>({value})});
 await new Promise(resolve=>setTimeout(resolve, 0));
 assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text, 'HUAWEI');
