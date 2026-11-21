@@ -10,7 +10,7 @@ shutil.copy2('/usr/bin/qemu-aarch64-static', root / 'usr/bin/qemu-aarch64-static
 (root / 'tmp/higoros-audit-state/devices-state.json').write_text('{}')
 env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='error')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
-proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 try:
     ready=False
     for _ in range(30):
@@ -19,7 +19,12 @@ try:
             with urllib.request.urlopen('http://127.0.0.1:18080/', timeout=1) as r: print('HTTP root status:', r.status); ready=True; break
         except Exception: time.sleep(1)
     print('daemon running:', proc.poll() is None, 'listener ready:', ready)
-    if not ready: sys.exit(1)
+    if not ready:
+        errors = (proc.stderr.read() if proc.poll() is not None else b'').decode('utf-8', 'replace')
+        for line in errors.splitlines():
+            if any(term in line.lower() for term in ('error', 'failed', 'missing', 'not found', 'panic', 'qemu')):
+                print('startup diagnostic:', line[:300])
+        sys.exit(1)
     for method in ['GET','DELETE']:
         req=urllib.request.Request('http://127.0.0.1:18080/api/devices/00:11:22:33:44:55', method=method)
         try:
