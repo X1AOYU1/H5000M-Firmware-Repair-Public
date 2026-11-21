@@ -4,6 +4,9 @@ import json, os, pathlib, shutil, subprocess, sys, time, urllib.error, urllib.re
 root = pathlib.Path(sys.argv[1]).resolve()
 state = root / "tmp/higoros-audit-state"
 runtime = root / "tmp/higoros-audit-runtime"
+(root / 'proc').mkdir(parents=True, exist_ok=True)
+subprocess.run(['mount', '--make-rprivate', '/'], check=True)
+subprocess.run(['mount', '-t', 'proc', 'proc', str(root / 'proc')], check=True)
 (root / 'tmp/sysinfo').mkdir(parents=True, exist_ok=True)
 (root / 'etc/config').mkdir(parents=True, exist_ok=True)
 (root / 'etc/config/network').write_text("config interface 'lan'\n	option device 'auditlan0'\n	option proto 'static'\n	option ipaddr '192.0.2.1'\n	option netmask '255.255.255.0'\n")
