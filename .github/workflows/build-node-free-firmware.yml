@@ -76,6 +76,18 @@ jobs:
       - name: Isolated synthetic HigoOS persistence audit
         continue-on-error: true
         run: sudo unshare --net python3 scripts/audit-higoros-state.py output/final-root
+      - name: Inspect wireless repeater password controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          assets = Path('output/final-root/usr/share/higoros/web/assets')
+          for p in assets.glob('*.js'):
+              s = p.read_text(encoding='utf-8')
+              for term in ('热点密码', '选择要中继的热点'):
+                  i = s.find(term)
+                  if i >= 0:
+                      print('ASSET', p.name, 'TERM', term, 'CONTEXT', s[max(0,i-2200):i+900])
+          PY
       - name: Preserve firmware build diagnostics
         if: always()
         uses: actions/upload-artifact@v4
