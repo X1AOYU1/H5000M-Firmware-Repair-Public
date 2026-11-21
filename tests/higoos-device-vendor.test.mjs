@@ -30,3 +30,24 @@ await new Promise(resolve=>setTimeout(resolve, 0));
 assert.equal(avatar.setup({mac:'E0:06:30:12:34:56', fallback:'device.svg'})().text[0].text[0].text, 'HUAWEI');
 assert.equal(avatar.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'})().text[0].text[0].attrs.src, 'device.svg');
 console.log('PASS: recognized brands get avatars, randomized addresses retain device icon');
+
+let saved = {};
+globalThis.fetch = async (url, options = {}) => {
+  if (options.method === 'POST') {
+    const form = options.body;
+    saved[form.get('mac')] = form.get('avatar');
+    return {ok:true, json:async()=>({avatar:form.get('avatar')})};
+  }
+  return {ok:true,json:async()=>({token:'test',avatars:{...saved}})};
+};
+const interactive = createDeviceAvatar({defineComponent:x=>x, h:(tag, attrs, text)=>({tag, attrs, text}), ref:value=>({value})});
+await new Promise(resolve=>setTimeout(resolve, 0));
+const render = interactive.setup({mac:'C6:AC:9F:F6:94:22', fallback:'device.svg'});
+render().text[0].attrs.onClick();
+await render().text[1].text[0].attrs.onChange({target:{value:'Samsung'}});
+assert.equal(saved.c6ac9ff69422, 'Samsung');
+assert.equal(render().text[0].text[0].text, 'Samsung');
+render().text[0].attrs.onClick();
+await render().text[1].text[0].attrs.onChange({target:{value:''}});
+assert.equal(render().text[0].text[0].attrs.src, 'device.svg');
+console.log('PASS: select, save, display and reset a device avatar');

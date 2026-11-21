@@ -61,7 +61,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
     return () => {
       const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value)));
       const image = brand
-        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'42px',height:'42px',borderRadius:'10px',fontSize:brand.length > 7 ? '8px' : '10px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
+        ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'50px',height:'50px',borderRadius:'10px',fontSize:brand.length > 7 ? '9px' : '11px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'rgba(0,123,196,.08)',overflow:'hidden'}}, brand)
         : h('img', {src:props.fallback, alt:'', class:'w-6 h-6 object-contain'});
       return h('div', {style:{position:'relative'}}, [
         h('button', {type:'button', title:'选择设备头像', 'aria-label':'选择设备头像', onClick:()=>{show.value=!show.value;error.value='';}}, [image]),
