@@ -24,6 +24,10 @@ for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
     device = root / 'dev' / name
     if not device.exists():
         os.mknod(device, 0o20666, os.makedev(1, minor))
+ubus_binary = root / 'bin/ubus'
+ubus_binary.rename(root / 'bin/ubus-real')
+ubus_binary.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> /tmp/audit-ubus-commands.log\nexec /bin/ubus-real "$@"\n')
+ubus_binary.chmod(0o755)
 (root / 'tmp/audit-lan.lua').write_text('''
 local ubus = require "ubus"
 local uloop = require "uloop"
@@ -95,6 +99,8 @@ finally:
     print('daemon diagnostic failures (last 80):')
     for line in failures[-80:]: print(line[:350])
     daemon_log.close()
+    commands = root / 'tmp/audit-ubus-commands.log'
+    if commands.exists(): print('ubus commands:', commands.read_text()[-6000:])
     for name, log in zip(['/sbin/ubusd', '/sbin/rpcd', '/usr/bin/lua'], service_logs):
         log.flush(); log.seek(0)
         print('service log:', name, log.read()[-4000:])
