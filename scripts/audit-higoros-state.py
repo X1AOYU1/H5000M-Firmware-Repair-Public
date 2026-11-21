@@ -6,7 +6,7 @@ state = root / "tmp/higoros-audit-state"
 runtime = root / "tmp/higoros-audit-runtime"
 (root / 'tmp/sysinfo').mkdir(parents=True, exist_ok=True)
 (root / 'etc/config').mkdir(parents=True, exist_ok=True)
-(root / 'etc/config/network').write_text("config interface 'lan'\n	option device 'lo'\n	option proto 'static'\n	option ipaddr '127.0.0.1'\n	option netmask '255.0.0.0'\n")
+(root / 'etc/config/network').write_text("config interface 'lan'\n	option device 'auditlan0'\n	option proto 'static'\n	option ipaddr '192.0.2.1'\n	option netmask '255.255.255.0'\n")
 (root / 'tmp/sysinfo/board_name').write_text('hiveton,h5000m\n')
 state.mkdir(parents=True, exist_ok=True)
 runtime.mkdir(parents=True, exist_ok=True)
@@ -16,6 +16,7 @@ password_hash = subprocess.check_output(['openssl', 'passwd', '-6', 'synthetic-a
 (root / 'etc/shadow').write_text('root:' + password_hash + ':19000:0:99999:7:::\n')
 env = dict(os.environ, HIGOROS_ADDR='127.0.0.1:18080', HIGOROS_STATE_DIR='/tmp/higoros-audit-state', HIGOROS_RUNTIME_DIR='/tmp/higoros-audit-runtime', HIGOROS_FRONTEND_DIR='/usr/share/higoros/web', HIGOROS_LOG_LEVEL='debug')
 subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
+subprocess.run(['ip', 'link', 'add', 'auditlan0', 'type', 'dummy'], check=True)
 (root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
 (root / 'dev').mkdir(exist_ok=True)
 for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
