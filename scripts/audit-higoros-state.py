@@ -17,9 +17,12 @@ subprocess.run(['ip', 'link', 'set', 'lo', 'up'], check=True)
 (root / 'tmp/run/ubus').mkdir(parents=True, exist_ok=True)
 services = []
 for binary in ['/sbin/ubusd', '/sbin/rpcd']:
-    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE))
     time.sleep(1)
 print('ubusd/rpcd running:', [p.poll() is None for p in services])
+for name, service in zip(['/sbin/ubusd', '/sbin/rpcd'], services):
+    if service.poll() is not None:
+        print('service diagnostic:', name, service.returncode, service.stderr.read().decode('utf-8', 'replace')[:2000])
 proc = subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', '/usr/sbin/higorosd'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 try:
     ready=False
