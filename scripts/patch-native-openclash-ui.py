@@ -5,6 +5,43 @@ import re
 import sys
 
 
+def patch_backup(root: Path, views: Path):
+    controller = root / "usr/lib/lua/luci/controller/openclash.lua"
+    source = controller.read_text(encoding="utf-8")
+    route = ('entry({"admin", "services", "openclash", "backup_upload"}, '
+             'post("action_luci_backup_upload")).acl_depends = { "luci-app-openclash" }')
+    if route not in source:
+        anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
+        old_fn = "function action_higoros_upload()\n"
+        old_auth = '\tif not higoros_session_valid() then return respond("error", "HigoOS session is invalid or expired; sign in again") end'
+        old_type = '\tlocal upload_type = HTTP.formvalue("upload_type") or ""'
+        end = '\nfunction action_backup()'
+        if any(source.count(value) != 1 for value in (anchor, old_fn, old_auth, old_type, end)):
+            raise SystemExit("ERROR: OpenClash backup upload controller hooks changed")
+        source = source.replace(anchor, anchor + "\n\t" + route, 1)
+        source = source.replace(old_fn, "local function handle_backup_upload(native)\n", 1)
+        source = source.replace(old_auth, old_auth.replace("if not", "if not native and not", 1), 1)
+        source = source.replace(old_type, old_type.replace("= HTTP", '= native and "backup-file" or HTTP', 1), 1)
+        source = source.replace(end, '\nfunction action_higoros_upload()\n\treturn handle_backup_upload(false)\nend\n'
+                                '\nfunction action_luci_backup_upload()\n\treturn handle_backup_upload(true)\nend\n' + end, 1)
+        controller.write_text(source, encoding="utf-8")
+
+    # Install with the native templates so the handlers work even when static LuCI assets are unavailable.
+    script = Path(__file__).with_name("luci-openclash-backup.js").read_text(encoding="utf-8")
+    tag = (
+        '<script id="h5000m-native-backup" '
+        'data-endpoint="<%=pcdata(luci.dispatcher.build_url(\'admin\', \'services\', \'openclash\', \'backup_upload\'))%>" '
+        'data-token="<%=pcdata(luci.dispatcher.context.authtoken or \'\')%>">\n' + script + '</script>\n'
+    )
+    for filename, button in (("upload.htm", 'id="upload-submit"'), ("status.htm", 'id="restore_backup_large"')):
+        view = views / filename
+        body = view.read_text(encoding="utf-8")
+        if body.count(button) != 1:
+            raise SystemExit(f"ERROR: native OpenClash restore control changed: {filename}")
+        if 'id="h5000m-native-backup"' not in body:
+            view.write_text(body + "\n" + tag, encoding="utf-8")
+
+
 def patch(root: Path):
     web = root / "usr/share/higoros/web"
     assets = web / "assets"
@@ -69,6 +106,8 @@ def patch(root: Path):
     status = (views / "status.htm").read_text(encoding="utf-8")
     if not all(f'data-openclash-style="{name}"' in status for name in ("oc-common.css", "oc-client.css")):
         raise SystemExit("ERROR: native OpenClash status styles are missing")
+    patch_backup(root, views)
+    print("PASS: native OpenClash backup forms use the authenticated LuCI chunk upload route")
     print("PASS: LuCI authenticates through its normal login and native OpenClash ships its page styles")
 
 

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
@@ -16,11 +17,25 @@ const luciPath = "/cgi-bin/luci/admin/services/openclash";
 const luciRequests = [];
 const signins = [];
 const fixturePassword = "browser-audit-password";
+const token = "luci-form-token-fixture";
+const configPath = luciPath + "/config";
+const nativeUploadPath = luciPath + "/backup_upload";
+const largeBackupSize = 31 * 1024 * 1024 + 93;
+const uploadRecords = [];
+let uploadState;
 const nativeTemplate = await readFile(process.argv[4] ?? resolve(root, "../../../lib/lua/luci/view/openclash/status.htm"), "utf8");
+const uploadTemplate = await readFile(process.argv[5] ?? resolve(root, "../../../lib/lua/luci/view/openclash/upload.htm"), "utf8");
+function renderLuaFixture(template) {
+  return template
+    .replace(/data-endpoint="<%=[\s\S]*?%>"/g, `data-endpoint="${nativeUploadPath}"`)
+    .replace(/data-token="<%=[\s\S]*?%>"/g, `data-token="${token}"`)
+    .replace(/<%:([\s\S]*?)%>/g, "$1")
+    .replace(/<%[\s\S]*?%>/g, "");
+}
 const statusMarkup = nativeTemplate
-  .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-  .replace(/<%:([\s\S]*?)%>/g, "$1")
-  .replace(/<%[\s\S]*?%>/g, "");
+  .replace(/<script\b(?![^>]*id="h5000m-native-backup")[^>]*>[\s\S]*?<\/script>/gi, "")
+  .replace('id="config-file-empty-state" class="config-file-empty-state oc-hidden"', 'id="config-file-empty-state" class="config-file-empty-state"');
+const configMarkup = renderLuaFixture(uploadTemplate.replace(/^<script src=.*<\/script>$/gm, ""));
 const apiRequests = [];
 const app = {
   name: "package-42",
@@ -44,6 +59,37 @@ const apiData = {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const cookie = request.headers.cookie ?? "";
+  if (url.pathname === nativeUploadPath) {
+    const error = (status, message) => response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify({ status: "error", message }));
+    if (request.method !== "POST" || !cookie.includes("sysauth_http=audit") || url.searchParams.get("token") !== token)
+      return error(403, "Authorization required");
+    const op = url.searchParams.get("operation");
+    const filename = url.searchParams.get("filename");
+    const id = url.searchParams.get("upload_id");
+    if (!/^[0-9a-f]{32}$/.test(id)) return error(400, "Invalid upload id");
+    if (op === "start") uploadState = { id, filename, size: 0, hash: createHash("sha256"), chunks: 0 };
+    else if (!uploadState || id !== uploadState.id || filename !== uploadState.filename) return error(400, "Invalid upload session");
+    else if (op === "chunk") {
+      if (request.headers["content-type"] !== "application/octet-stream" || Number(url.searchParams.get("offset")) !== uploadState.size)
+        return error(400, "Invalid chunk request");
+      const parts = [];
+      for await (const part of request) parts.push(part);
+      const chunk = Buffer.concat(parts);
+      if (!chunk.length || chunk.length > 65536) return error(413, "Chunk too large");
+      uploadState.size += chunk.length;
+      uploadState.chunks++;
+      uploadState.hash.update(chunk);
+    } else if (op === "finish") {
+      if (filename === "Invalid backup.tar.gz") return error(422, "备份归档无法读取");
+      uploadRecords.push({ filename, size: uploadState.size, chunks: uploadState.chunks, hash: uploadState.hash.digest("hex") });
+      uploadState = undefined;
+    } else if (op === "cancel") {
+      uploadRecords.push({ filename, cancelled: true });
+      uploadState = undefined;
+    } else return error(400, "Unknown operation");
+    response.writeHead(200, { "content-type": "application/json" });
+    return response.end(JSON.stringify({ status: "success", message: "备份已导入，OpenClash 保持关闭" }));
+  }
   if (url.pathname === "/cgi-bin/luci/admin" && request.method === "POST") {
     const parts = [];
     for await (const part of request) parts.push(part);
@@ -60,8 +106,8 @@ const server = createServer(async (request, response) => {
     }).end();
     return;
   }
-  if (url.pathname === luciPath) {
-    luciRequests.push({
+  if (url.pathname === luciPath || url.pathname === configPath) {
+    if (url.pathname === luciPath) luciRequests.push({
       method: request.method,
       mode: request.headers["sec-fetch-mode"],
       destination: request.headers["sec-fetch-dest"],
@@ -71,9 +117,13 @@ const server = createServer(async (request, response) => {
       response.end("<!doctype html><title>LuCI</title><main>LuCI sign-in fixture</main>");
       return;
     }
+    if (request.method !== "GET") return response.writeHead(413).end("Full multipart POST must not be used for backups");
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    const markup = url.pathname === configPath
+      ? `<form action="${configPath}" method="post" enctype="multipart/form-data">${configMarkup}</form>`
+      : `<a href="${configPath}">配置管理</a>${renderLuaFixture(statusMarkup)}`;
     response.end("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
-      "<title>OpenClash</title><body class=logged-in><aside id=mainmenu>LuCI navigation</aside>" + statusMarkup);
+      "<title>OpenClash</title><body class=logged-in><aside id=mainmenu>LuCI navigation</aside>" + markup);
     return;
   }
   if (url.pathname.startsWith("/luci-static/")) {
@@ -199,7 +249,31 @@ try {
       nodes.length > 0 && nodes.every(node => getComputedStyle(node).display === "grid")));
   }
   await page.setViewportSize({ width: 1280, height: 900 });
-  const unexpected = pageErrors.filter(message => !message.includes("404"));
+  const waitForUpload = async (text) => frame.getByText(text, { exact: true }).waitFor({ state: "visible", timeout: 35_000 });
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent("filechooser", { timeout: 8000 }),
+    frame.locator("#restore_backup_large").click({ timeout: 8000 }),
+  ]);
+  await fileChooser.setFiles({ name: "Overview backup.tar.gz", mimeType: "application/gzip", buffer: Buffer.from("overview") });
+  await waitForUpload("备份已导入，OpenClash 保持关闭");
+  await frame.getByRole("link", { name: "配置管理", exact: true }).click();
+  await frame.locator("#file_type").selectOption("backup-file");
+  assert.equal(await frame.locator("#ulfile").getAttribute("accept"), ".tar,.tar.gz");
+  await frame.locator("#ulfile").setInputFiles({ name: "Invalid backup.tar.gz", mimeType: "application/gzip", buffer: Buffer.from("invalid") });
+  await frame.locator("#upload-submit").click();
+  await waitForUpload("备份请求失败（HTTP 422）");
+  const largeBackup = Buffer.alloc(largeBackupSize, 0x53);
+  const filename = "Backup-OpenClash-Hiveton H5000M-aarch64-test.tar";
+  await frame.locator("#ulfile").setInputFiles({ name: filename, mimeType: "application/x-tar", buffer: largeBackup });
+  await frame.locator("#upload-submit").click();
+  await waitForUpload("备份已导入，OpenClash 保持关闭");
+  assert.deepEqual(uploadRecords, [
+    { filename: "Overview backup.tar.gz", size: 8, chunks: 1, hash: createHash("sha256").update("overview").digest("hex") },
+    { filename: "Invalid backup.tar.gz", cancelled: true },
+    { filename, size: largeBackupSize, chunks: Math.ceil(largeBackupSize / 65536), hash: createHash("sha256").update(largeBackup).digest("hex") },
+  ]);
+  assert.equal(page.url(), baseUrl + "/apps/openclash-luci");
+  const unexpected = pageErrors.filter(message => !message.includes("404") && !message.includes("422"));
   assert.deepEqual(unexpected, []);
   pageErrors.length = 0;
 
@@ -239,6 +313,7 @@ try {
     "PASS: the HigoOS route stays open and loads native LuCI in its content frame",
     "PASS: HigoOS sign-in establishes a separate LuCI cookie in the authentication fixture",
     "PASS: native OpenClash cards use two columns on desktop and one on mobile without external CSS",
+    "PASS: native OpenClash overview restores .tar.gz and configuration page sends a 31 MiB .tar intact in authenticated chunks; upload errors stay inside the page",
     "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,

@@ -89,8 +89,9 @@ jobs:
         run: |
           mkdir -p "$AUDIT_DIR"
           sudo install -m 0644 output/final-root/usr/lib/lua/luci/view/openclash/status.htm "$AUDIT_DIR/native-status.htm"
+          sudo install -m 0644 output/final-root/usr/lib/lua/luci/view/openclash/upload.htm "$AUDIT_DIR/native-upload.htm"
           set +e
-          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" "$AUDIT_DIR/native-status.htm" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
+          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" "$AUDIT_DIR/native-status.htm" "$AUDIT_DIR/native-upload.htm" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
           result=$?
           if [ ! -f "$AUDIT_DIR/openclash-entry-browser.txt" ]; then
             cp "$AUDIT_DIR/openclash-entry-browser-process.log" "$AUDIT_DIR/openclash-entry-browser.txt"
@@ -139,7 +140,8 @@ jobs:
           name: H5000M complete repair, node-free
           body: >-
             Built from the complete repair baseline. The OpenClash app-center
-            card opens native LuCI inside the HigoOS layout. The previous HigoOS address
+            card opens native LuCI inside the HigoOS layout, with native backup
+            imports sent in authenticated chunks. The previous HigoOS address
             remains available with filtered backup import;
             proxy nodes and subscription credentials were removed. Other
             firmware repairs and H5000M upgrade metadata were verified.
