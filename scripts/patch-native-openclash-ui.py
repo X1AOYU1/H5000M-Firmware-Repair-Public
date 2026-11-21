@@ -90,6 +90,12 @@ def patch(root: Path):
         if source.count(anchor) != 1:
             raise SystemExit("ERROR: HigoOS OpenClash router hook changed")
         source = source.replace(anchor, route + anchor, 1)
+    passwall = '{path:"apps/passwall-luci",component:()=>import("./higoos-native-openclash.js"),props:{passwall:true},meta:{title:"PassWall"}},'
+    if passwall not in source:
+        anchor = '{path:"apps/passwall",'
+        if source.count(anchor) != 1:
+            raise SystemExit("ERROR: HigoOS PassWall router hook changed")
+        source = source.replace(anchor, passwall + anchor, 1)
     bundle.write_text(source, encoding="utf-8")
     vendors = sorted(assets.glob("vendor-*.js"))
     if len(vendors) != 1:

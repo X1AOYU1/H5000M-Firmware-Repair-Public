@@ -14,6 +14,7 @@ if (!root || !reportPath || !moduleRoot)
 const require = createRequire(join(moduleRoot, "__audit__.cjs"));
 const { chromium } = require("playwright");
 const luciPath = "/cgi-bin/luci/admin/services/openclash";
+const passwallPath = "/cgi-bin/luci/admin/services/passwall";
 const luciRequests = [];
 const signins = [];
 const fixturePassword = "browser-audit-password";
@@ -45,9 +46,10 @@ const app = {
   kind: "native",
   entryRoute: { path: "/wrong" },
 };
+const passwall = { ...app, name: "luci-app-passwall", featureKey: "passwall", displayName: "Pass Wall", entryRoute: { path: "/apps/passwall" } };
 const apiData = {
   "/api/v1/auth/me": { username: "route-audit", role: "admin", permissions: ["*"] },
-  "/api/v1/plugins/apps": { apps: [app] },
+  "/api/v1/plugins/apps": { apps: [app, passwall] },
   "/api/v1/notifications": [],
   "/api/v1/notifications/settings": { enabled: false },
   "/api/v1/openclash/status": { running: false, coreAvailable: false },
@@ -105,6 +107,14 @@ const server = createServer(async (request, response) => {
       "set-cookie": "sysauth_http=audit; Path=/cgi-bin/luci; HttpOnly; SameSite=Strict",
     }).end();
     return;
+  }
+  if (url.pathname === passwallPath || url.pathname === passwallPath + "/node_list") {
+    if (!cookie.includes("sysauth_http=audit")) return response.writeHead(403).end();
+    const heading = url.pathname === passwallPath ? "PassWall Basic Settings" : "PassWall Node List";
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    return response.end(`<!doctype html><body class="logged-in"><aside id="mainmenu">LuCI navigation</aside>
+      <div class="main-right"><header>LuCI header</header><main id="maincontent"><h1>${heading}</h1>
+      <div id="tabmenu"><a href="${passwallPath}/node_list">Node List</a></div></main></div>`);
   }
   if (url.pathname === luciPath || url.pathname === configPath) {
     if (url.pathname === luciPath) luciRequests.push({
@@ -219,7 +229,7 @@ try {
   assert.deepEqual(signins, ["higoros", "luci"], "LuCI sign-in must follow successful HigoOS sign-in");
   pageErrors.length = 0;
   await page.goto(baseUrl + "/plugins", { waitUntil: "domcontentloaded" });
-  const openLink = page.getByRole("link", { name: "打开" });
+  const openLink = page.locator('a[href="/apps/openclash-luci"]').and(page.getByRole("link", { name: "打开", exact: true }));
   await openLink.waitFor({ state: "visible", timeout: 10_000 });
   const href = await openLink.getAttribute("href");
   assert.equal(href, "/apps/openclash-luci");
@@ -277,6 +287,18 @@ try {
   assert.deepEqual(unexpected, []);
   pageErrors.length = 0;
 
+  await page.getByRole("link", { name: "应用中心", exact: true }).click();
+  const openPasswall = page.locator('a[href="/apps/passwall-luci"]').and(page.getByRole("link", { name: "打开", exact: true }));
+  await openPasswall.click({ timeout: 10000 });
+  await page.waitForURL("**/apps/passwall-luci");
+  const passwallFrame = page.frameLocator('iframe[title="PassWall (LuCI)"]');
+  await passwallFrame.getByRole("heading", { name: "PassWall Basic Settings" }).waitFor({ state: "visible" });
+  await passwallFrame.locator("#mainmenu").waitFor({ state: "hidden" });
+  await page.getByRole("link", { name: "应用中心", exact: true }).waitFor({ state: "visible" });
+  await passwallFrame.getByRole("link", { name: "Node List", exact: true }).click();
+  await passwallFrame.getByRole("heading", { name: "PassWall Node List" }).waitFor({ state: "visible" });
+  assert.equal(page.url(), baseUrl + "/apps/passwall-luci");
+
   // Retain the configuration-tab regression check for direct visits to the older URL.
   await page.goto(`${baseUrl}/apps/openclash`, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "基本设置", exact: true }).waitFor({ state: "visible", timeout: 10_000 });
@@ -314,6 +336,7 @@ try {
     "PASS: HigoOS sign-in establishes a separate LuCI cookie in the authentication fixture",
     "PASS: native OpenClash cards use two columns on desktop and one on mobile without external CSS",
     "PASS: native OpenClash overview restores .tar.gz and configuration page sends a 31 MiB .tar intact in authenticated chunks; upload errors stay inside the page",
+    "PASS: PassWall opens and navigates its native LuCI fixture inside HigoOS using the same LuCI session",
     "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,

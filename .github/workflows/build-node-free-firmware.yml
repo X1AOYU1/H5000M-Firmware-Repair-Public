@@ -141,9 +141,9 @@ jobs:
           tag_name: h5000m-complete-repair-node-free
           name: H5000M complete repair, node-free
           body: >-
-            Built from the complete repair baseline. The OpenClash app-center
-            card opens native LuCI inside the HigoOS layout, with native backup
-            imports sent in authenticated chunks. The previous HigoOS address
+            Built from the complete repair baseline. OpenClash and PassWall
+            open native LuCI inside the HigoOS layout. OpenClash backup imports
+            restore and verify profiles, and GEO updates return to settings. The previous HigoOS address
             remains available with filtered backup import;
             proxy nodes and subscription credentials were removed. Other
             firmware repairs and H5000M upgrade metadata were verified.

@@ -203,11 +203,14 @@ router = next(path.read_text(encoding="utf-8") for path in assets.glob("index-*.
 assert 'to:{path:"/apps/openclash-luci"}' in plugins
 assert 'path:"apps/openclash"' in router
 assert 'path:"apps/openclash-luci"' in router
+assert 'to:{path:"/apps/passwall-luci"}' in plugins and 'path:"apps/passwall-luci"' in router
+assert 'cbi(appname .. "/client/global")' in (root / "usr/lib/lua/luci/controller/passwall.lua").read_text(encoding="utf-8")
+assert (root / "usr/lib/lua/luci/model/cbi/passwall/client/global.lua").is_file()
 assert len(list(assets.glob("higoos-native-openclash-*.js"))) == 1
 assert (root / "www/cgi-bin/luci").is_file()
 assert (root / "www/luci-static/resources/openclash").is_dir()
 assert 'entry({"admin", "services", "openclash"}' in (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8")
-print("PASS: final firmware includes the registered LuCI OpenClash page and its embedded HigoOS entry")
+print("PASS: final firmware includes native LuCI OpenClash and PassWall and their embedded HigoOS entries")
 PY
 python3 - "$OUT/final-root/etc/config/openclash" "$OUT/final-root/etc/openclash/config" "$OUT/final-root/usr/share/higoros/web/assets" "$OUT/final-root/usr/share/openclash" <<'PY'
 from pathlib import Path

@@ -37,6 +37,10 @@ with tempfile.TemporaryDirectory() as temporary:
                   [{kind:"native",name:"luci-app-openclash",entryRoute:{path:"/wrong"}}, expectedNative],
                   [{kind:"legacy",displayName:"OpenClash"}, expectedNative],
                   [{kind:"native",entryRoute:{path:"/apps/openclash"}}, expectedNative],
+                  [{kind:"native",name:"luci-app-passwall"}, ["router-link", "/apps/passwall-luci"]],
+                  [{kind:"legacy",displayName:"Pass Wall"}, ["router-link", "/apps/passwall-luci"]],
+                  [{kind:"native",entryRoute:{path:"/apps/passwall"}}, ["router-link", "/apps/passwall-luci"]],
+                  [{kind:"native",featureKey:"passwall2",entryRoute:{path:"/apps/passwall2"}}, ["router-link", "/apps/passwall2"]],
                   [{kind:"native",featureKey:"other"}, ["router-link", "/other"]],
                   [{kind:"native",entryRoute:{path:"/vpn"}}, ["router-link", "/vpn"]],
                   [{kind:"legacy",name:"other"}, ["legacy", "existing"]]
