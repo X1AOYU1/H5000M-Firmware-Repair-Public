@@ -54,7 +54,7 @@ const devices = [
   { id: "router-audit-phone", name: "测试手机", macAddress: "02:00:00:00:00:01",
     ipAddress: "10.0.0.201", osType: "android", deviceType: "mobile", isOnline: true, trafficAvailable: false },
   { id: "router-audit-pc", name: "测试电脑", macAddress: "02:00:00:00:00:02",
-    ipAddress: "10.0.0.202", osType: "windows", deviceType: "computer", isOnline: true, trafficAvailable: false },
+    ipAddress: "10.0.0.202", osType: "windows", deviceType: "computer", isOnline: true, connectionType: "wired", trafficAvailable: false },
 ];
 const remarks = {};
 const remarkWrites = [];
@@ -73,6 +73,7 @@ const apiData = {
   "/api/v1/notifications": [],
   "/api/v1/notifications/settings": { enabled: false },
   "/api/v1/devices": devices,
+  "/api/v1/system/network-interfaces": [{ name: "eth1", connected: true, speedLabel: "2500 Mbps" }],
   "/api/v1/openclash/status": { running: false, coreAvailable: false },
   "/api/v1/openclash/settings": { revision: "audit", fields: [], values: {} },
   "/api/v1/openclash/files": { rows: [] },
@@ -366,6 +367,7 @@ try {
   assert.equal(page.url(), baseUrl + "/apps/passwall-luci");
 
   await page.goto(baseUrl + "/devices", { waitUntil: "domcontentloaded" });
+  await page.getByText("（LAN 口 2500 Mbps）", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
   const remark = page.getByRole("button", { name: "备注：测试手机", exact: true });
   const input = page.getByPlaceholder("输入设备备注");
   const saveRemark = page.getByRole("button", { name: "保存", exact: true });

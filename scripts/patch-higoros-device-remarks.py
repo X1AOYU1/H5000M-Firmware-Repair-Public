@@ -25,6 +25,17 @@ def patch(root: Path) -> None:
     elif not all(body.count(new) == 1 for _, new in edits):
         raise SystemExit("ERROR: HigoOS device card anchors changed")
 
+    body = page.read_text(encoding="utf-8")
+    link_setup = 'const h5000mLanLink=createLanLink(Be);'
+    if link_setup not in body:
+        anchor = 'setup(l,{emit:g}){const h5000mDeviceRemark='
+        rate = 'e("span",Ks,o(s(at)(t.connectionDetail)),1)'
+        if body.count(anchor) != 1 or body.count(rate) != 1:
+            raise SystemExit("ERROR: HigoOS LAN link card anchors changed")
+        body = body.replace(anchor, 'setup(l,{emit:g}){' + link_setup + 'const h5000mDeviceRemark=', 1)
+        body = body.replace(rate, rate + ',r(h5000mLanLink,{device:t},null,8,["device"])', 1)
+        page.write_text('import{createLanLink}from"./higoos-lan-link.js";' + body, encoding="utf-8")
+
     type_anchor = 'v=A(()=>g.data.value??[])'
     type_replacement = 'v=A(()=>(g.data.value??[]).map(inferDeviceType))'
     body = page.read_text(encoding="utf-8")
@@ -50,6 +61,7 @@ def patch(root: Path) -> None:
     elif "function action_higoros_device_remarks()" not in controller_source:
         raise SystemExit("ERROR: device remarks route has no handler")
     files = {
+        assets / "higoos-lan-link.js": (sources / "higoos-lan-link.js").read_text(encoding="utf-8"),
         assets / "higoos-device-type.js": (sources / "higoos-device-type.js").read_text(encoding="utf-8"),
         assets / "higoos-device-remarks.js": (sources / "higoos-device-remarks.js").read_text(encoding="utf-8"),
         root / "lib/upgrade/keep.d/higoos-device-remarks": "/etc/higoos-device-remarks/\n",
