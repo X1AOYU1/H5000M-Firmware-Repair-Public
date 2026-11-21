@@ -54,7 +54,10 @@ if login.count(mounted_anchor) == 1:
 elif login_probe in login:
     pass
 elif 'localStorage.getItem("higoos_argon_login_wallpaper")' in login:
-    mounted_start = login.index('(()=>{const p=[];try{const w=localStorage.getItem("higoos_argon_login_wallpaper")')
+    wallpaper_marker = login.index('localStorage.getItem("higoos_argon_login_wallpaper")')
+    mounted_start = login.rfind('(()=>{', 0, wallpaper_marker)
+    if mounted_start < 0:
+        raise SystemExit("ERROR: HigoOS login wallpaper probe wrapper changed")
     mounted_end = login.index('})(),H()', mounted_start) + len('})(),H()')
     login = login[:mounted_start] + login_probe + ',H()' + login[mounted_end:]
 else:
