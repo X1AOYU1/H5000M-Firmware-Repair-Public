@@ -64,7 +64,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/dashboard`);
   const select = page.getByLabel('仪表板刷新间隔');
   await select.waitFor();
-  for (const seconds of [2,3,5]) {
+  for (const seconds of [1,2,3,5]) {
     await select.selectOption(String(seconds));
     await page.waitForTimeout(350);
     const since = Date.now(), before = resourceCycle;

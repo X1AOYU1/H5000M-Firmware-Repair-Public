@@ -33,7 +33,7 @@ export function createDeviceVendor({defineComponent, h, ref}) {
   });
   database.then(value => { vendors.value = value; }).catch(() => {});
   return defineComponent({name:'HigoosDeviceVendor', props:{mac:String}, setup(props) {
-    return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'break-all'}, `厂商：${vendor}`) : null; };
+    return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'break-all',style:{fontSize:'11px',lineHeight:'1.25',opacity:'0.78',maxWidth:'100%'}}, `厂商：${vendor}`) : null; };
   }});
 }
 export function brandLogo(brand) {
@@ -73,7 +73,7 @@ export function createDeviceAvatar({defineComponent, h, ref}) {
     return () => {
       const brand = choices.value[key()] || (vendors.value && vendorBrand(findVendor(props.mac, vendors.value))) || brandFromDeviceName(props.name);
       const logo = brandLogo(brand);
-      const image = logo ? h('span', {title:brand,style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',background:'transparent'}}, [h('img',{src:logo,alt:brand,style:{width:'80%',height:'80%',objectFit:'contain'}})]) : brand
+      const image = logo ? h('span', {title:brand,style:{display:'flex',alignItems:'center',justifyContent:'center',width:'60px',height:'60px',borderRadius:'10px',background:'transparent'}}, [h('img',{src:logo,alt:brand,style:{width:'100%',height:'100%',objectFit:'contain',shapeRendering:'geometricPrecision'}})]) : brand
         ? h('span', {title:brand, style:{display:'flex',alignItems:'center',justifyContent:'center',width:'54px',height:'54px',borderRadius:'10px',fontSize:brand.length > 7 ? '12px' : brand.length > 4 ? '14px' : '17px',fontWeight:'700',letterSpacing:'-.3px',color:'#0879bd',background:'transparent',overflow:'hidden'}}, brand)
         : h('img', {src:props.fallback, alt:'', class:'w-9 h-9 object-contain'});
       return h('div', {style:{position:'relative'}}, [

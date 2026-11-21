@@ -60,4 +60,14 @@ await render().text[1].text[1].text[12].attrs.onClick();
 assert.equal(saved.c6ac9ff69422, 'Computer');
 assert.equal(render().text[0].text[0].text[0].attrs.src, '/assets/device-logos/computer.svg');
 assert.match(await readFile('scripts/device-logos/huawei.svg', 'utf8'), /fill="#E60012"/);
+assert.match(await readFile('scripts/device-logos/huawei.svg', 'utf8'), />HUAWEI<\/text>/);
+const appleLogo = await readFile('scripts/device-logos/apple.svg', 'utf8');
+assert.match(appleLogo, /viewBox="0 0 64 64"/);
+assert.match(appleLogo, /<path[^>]+fill="#111827"/);
+assert.doesNotMatch(appleLogo, />Apple<\/text>/);
+for (const icon of ['computer','tv','phone','tablet']) {
+  const svg = await readFile(`scripts/device-logos/${icon}.svg`, 'utf8');
+  assert.match(svg, /viewBox="0 0 64 64"/);
+  assert.match(svg, /#[0-9a-fA-F]{6}/);
+}
 console.log('PASS: computer selection displays an icon and Huawei logo is colored');

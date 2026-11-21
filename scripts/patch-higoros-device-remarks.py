@@ -103,7 +103,12 @@ def patch(root: Path) -> None:
         anchor = 'h=5e3,re=(e=!0)=>m({'
         if source.count(anchor) != 1 or source.count('queryFn:()=>y.getDevices()') != 1 or source.count('queryFn:()=>y.getTrafficRanking()') != 1:
             raise SystemExit("ERROR: device refresh anchors changed")
-        source = source.replace(anchor, 'h=5e3;'+batch+'const re=(e=!0)=>m({', 1)
+        # Keep device cards and traffic ranking on the same user-selected
+        # clock as the dashboard. The realtime option is one second and is
+        # also the default for this page so traffic values visibly move.
+        refresh_clock = ('h=(()=>{try{const v=Number(localStorage.getItem("h5000m-dashboard-refresh"));'
+                         'return [1,2,3,5].includes(v)?v*1e3:1e3}catch{return 1e3}})();')
+        source = source.replace(anchor, refresh_clock+batch+'const re=(e=!0)=>m({', 1)
         source = source.replace('queryFn:()=>y.getDevices()', 'queryFn:()=>h5000mFetch(0)', 1)
         source = source.replace('queryFn:()=>y.getTrafficRanking()', 'queryFn:()=>h5000mFetch(1)', 1)
         query.write_text(source, encoding="utf-8")
