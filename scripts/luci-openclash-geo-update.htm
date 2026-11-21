@@ -1,0 +1,7 @@
+<%+cbi/valueheader%>
+<button type="button" class="btn cbi-button cbi-button-reload"
+ data-h5000m-geo="<%=pcdata(self.h5000m_update_kind)%>"
+ data-endpoint="<%=pcdata(luci.dispatcher.build_url('admin', 'services', 'openclash', 'geo_update_row'))%>"
+ data-token="<%=pcdata(luci.dispatcher.context.authtoken or '')%>"><%=pcdata(self.inputtitle)%></button>
+<span class="oc-ml-1" role="status" aria-live="polite"></span>
+<%+cbi/valuefooter%>

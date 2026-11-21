@@ -20,12 +20,23 @@ const signins = [];
 const fixturePassword = "browser-audit-password";
 const token = "luci-form-token-fixture";
 const configPath = luciPath + "/config";
+const geoPath = luciPath + "/settings";
+const geoEndpoint = luciPath + "/geo_update_row";
+const geoKinds = ["ipdb", "geoip", "geosite", "geoasn", "chnroute"];
+const geoRequests = [];
 const nativeUploadPath = luciPath + "/backup_upload";
 const largeBackupSize = 31 * 1024 * 1024 + 93;
 const uploadRecords = [];
 let uploadState;
 const nativeTemplate = await readFile(process.argv[4] ?? resolve(root, "../../../lib/lua/luci/view/openclash/status.htm"), "utf8");
 const uploadTemplate = await readFile(process.argv[5] ?? resolve(root, "../../../lib/lua/luci/view/openclash/upload.htm"), "utf8");
+const geoTemplate = await readFile(process.argv[6] ?? resolve(root, "../../../lib/lua/luci/view/openclash/h5000m_geo_update.htm"), "utf8");
+const geoMarkup = geoKinds.map(kind => '<div style="padding:20px">' + geoTemplate
+  .replace(/data-h5000m-geo="<%=[\s\S]*?%>"/g, `data-h5000m-geo="${kind}"`)
+  .replace(/data-endpoint="<%=[\s\S]*?%>"/g, `data-endpoint="${geoEndpoint}"`)
+  .replace(/data-token="<%=[\s\S]*?%>"/g, `data-token="${token}"`)
+  .replace("<%=pcdata(self.inputtitle)%>", "检查并更新")
+  .replace(/<%[\s\S]*?%>/g, "") + "</div>").join("");
 function renderLuaFixture(template) {
   return template
     .replace(/data-endpoint="<%=[\s\S]*?%>"/g, `data-endpoint="${nativeUploadPath}"`)
@@ -38,6 +49,15 @@ const statusMarkup = nativeTemplate
   .replace('id="config-file-empty-state" class="config-file-empty-state oc-hidden"', 'id="config-file-empty-state" class="config-file-empty-state"');
 const configMarkup = renderLuaFixture(uploadTemplate.replace(/^<script src=.*<\/script>$/gm, ""));
 const apiRequests = [];
+const remarkEndpoint = "/cgi-bin/luci/admin/system/higoos-device-remarks";
+const devices = [
+  { id: "router-audit-phone", name: "测试手机", macAddress: "02:00:00:00:00:01",
+    ipAddress: "10.0.0.201", osType: "android", deviceType: "mobile", isOnline: true, trafficAvailable: false },
+  { id: "router-audit-pc", name: "测试电脑", macAddress: "02:00:00:00:00:02",
+    ipAddress: "10.0.0.202", osType: "windows", deviceType: "computer", isOnline: true, trafficAvailable: false },
+];
+const remarks = {};
+const remarkWrites = [];
 const app = {
   name: "package-42",
   featureKey: "feature-42",
@@ -52,6 +72,7 @@ const apiData = {
   "/api/v1/plugins/apps": { apps: [app, passwall] },
   "/api/v1/notifications": [],
   "/api/v1/notifications/settings": { enabled: false },
+  "/api/v1/devices": devices,
   "/api/v1/openclash/status": { running: false, coreAvailable: false },
   "/api/v1/openclash/settings": { revision: "audit", fields: [], values: {} },
   "/api/v1/openclash/files": { rows: [] },
@@ -61,6 +82,32 @@ const apiData = {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const cookie = request.headers.cookie ?? "";
+  if (url.pathname === geoEndpoint) {
+    if (request.method !== "POST" || !cookie.includes("sysauth_http=audit")) return response.writeHead(403).end();
+    const parts = [];
+    for await (const part of request) parts.push(part);
+    const form = new URLSearchParams(Buffer.concat(parts).toString());
+    const kind = form.get("kind");
+    if (form.get("token") !== token || !geoKinds.includes(kind)) return response.writeHead(400).end();
+    geoRequests.push(kind);
+    response.writeHead(200, { "content-type": "application/json" });
+    return response.end(JSON.stringify({ status: "queued", kind }));
+  }
+  if (url.pathname === remarkEndpoint || url.pathname === remarkEndpoint + "/save") {
+    if (!cookie.includes("sysauth_http=audit")) return response.writeHead(403).end();
+    const send = (data) => response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(data));
+    if (url.pathname === remarkEndpoint && request.method === "GET") return send({ remarks, token });
+    if (url.pathname !== remarkEndpoint + "/save" || request.method !== "POST") return response.writeHead(405).end();
+    const parts = [];
+    for await (const part of request) parts.push(part);
+    const form = new URLSearchParams(Buffer.concat(parts).toString());
+    if (form.get("token") !== token) return response.writeHead(403).end();
+    const mac = form.get("mac"), note = form.get("note");
+    remarkWrites.push({ mac, note });
+    if (note) remarks[mac] = note;
+    else delete remarks[mac];
+    return send({ note });
+  }
   if (url.pathname === nativeUploadPath) {
     const error = (status, message) => response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify({ status: "error", message }));
     if (request.method !== "POST" || !cookie.includes("sysauth_http=audit") || url.searchParams.get("token") !== token)
@@ -116,7 +163,7 @@ const server = createServer(async (request, response) => {
       <div class="main-right"><header>LuCI header</header><main id="maincontent"><h1>${heading}</h1>
       <div id="tabmenu"><a href="${passwallPath}/node_list">Node List</a></div></main></div>`);
   }
-  if (url.pathname === luciPath || url.pathname === configPath) {
+  if (url.pathname === luciPath || url.pathname === configPath || url.pathname === geoPath) {
     if (url.pathname === luciPath) luciRequests.push({
       method: request.method,
       mode: request.headers["sec-fetch-mode"],
@@ -129,9 +176,9 @@ const server = createServer(async (request, response) => {
     }
     if (request.method !== "GET") return response.writeHead(413).end("Full multipart POST must not be used for backups");
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    const markup = url.pathname === configPath
+    const markup = url.pathname === geoPath ? `<form action="${geoPath}" method="post">${geoMarkup}</form>` : url.pathname === configPath
       ? `<form action="${configPath}" method="post" enctype="multipart/form-data">${configMarkup}</form>`
-      : `<a href="${configPath}">配置管理</a>${renderLuaFixture(statusMarkup)}`;
+      : `<a href="${configPath}">配置管理</a><a href="${geoPath}">插件设置</a>${renderLuaFixture(statusMarkup)}`;
     response.end("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
       "<title>OpenClash</title><body class=logged-in><aside id=mainmenu>LuCI navigation</aside>" + markup);
     return;
@@ -287,6 +334,25 @@ try {
   assert.deepEqual(unexpected, []);
   pageErrors.length = 0;
 
+  await frame.locator("body").evaluate((body, home) => body.ownerDocument.location.assign(home), luciPath);
+  await frame.getByRole("link", { name: "插件设置", exact: true }).click();
+  await frame.locator("[data-h5000m-geo=geoip]").waitFor();
+  const order = ["geoip", "ipdb", "geoasn", "chnroute", "geosite"];
+  let reloads = 0;
+  const trackSettingsLoad = nav => { if (new URL(nav.url()).pathname === geoPath) reloads++; };
+  page.on("framenavigated", trackSettingsLoad);
+  for (const kind of order) {
+    const button = frame.locator(`[data-h5000m-geo=${kind}]`);
+    const rowStatus = button.locator("xpath=following-sibling::*[1]");
+    await button.click();
+    await rowStatus.getByText("已提交更新，请在插件日志查看结果", { exact: true }).waitFor();
+    assert.deepEqual(geoRequests, order.slice(0, order.indexOf(kind) + 1));
+  }
+  assert.equal(reloads, 0, "GEO update must not reload settings");
+  page.off("framenavigated", trackSettingsLoad);
+  assert.deepEqual(pageErrors.filter(message => !message.includes("404")), []);
+  pageErrors.length = 0;
+
   await page.getByRole("link", { name: "应用中心", exact: true }).click();
   const openPasswall = page.locator('a[href="/apps/passwall-luci"]').and(page.getByRole("link", { name: "打开", exact: true }));
   await openPasswall.click({ timeout: 10000 });
@@ -298,6 +364,27 @@ try {
   await passwallFrame.getByRole("link", { name: "Node List", exact: true }).click();
   await passwallFrame.getByRole("heading", { name: "PassWall Node List" }).waitFor({ state: "visible" });
   assert.equal(page.url(), baseUrl + "/apps/passwall-luci");
+
+  await page.goto(baseUrl + "/devices", { waitUntil: "domcontentloaded" });
+  const remark = page.getByRole("button", { name: "备注：测试手机", exact: true });
+  const input = page.getByPlaceholder("输入设备备注");
+  const saveRemark = page.getByRole("button", { name: "保存", exact: true });
+  const eventuallyVisible = { state: "visible", timeout: 10_000 };
+  const note = "客厅手机";
+  await remark.click({ timeout: 10_000 });
+  await input.fill(note);
+  await saveRemark.click();
+  await page.getByText(note, { exact: true }).waitFor(eventuallyVisible);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByText(note, { exact: true }).waitFor(eventuallyVisible);
+  await page.getByRole("button", { name: "测试手机", exact: true }).waitFor(eventuallyVisible);
+  await page.getByRole("button", { name: "备注：测试电脑", exact: true }).waitFor(eventuallyVisible);
+  await remark.click();
+  await input.fill("");
+  await saveRemark.click();
+  await page.getByText(note, { exact: true }).waitFor({ state: "hidden", timeout: 10_000 });
+  assert.deepEqual(remarkWrites, [{ mac: "020000000001", note }, { mac: "020000000001", note: "" }]);
+  assert.ok(!apiRequests.some(value => value.startsWith("PATCH /api/v1/devices/")), "Device names must not be modified");
 
   // Retain the configuration-tab regression check for direct visits to the older URL.
   await page.goto(`${baseUrl}/apps/openclash`, { waitUntil: "domcontentloaded" });
@@ -337,6 +424,8 @@ try {
     "PASS: native OpenClash cards use two columns on desktop and one on mobile without external CSS",
     "PASS: native OpenClash overview restores .tar.gz and configuration page sends a 31 MiB .tar intact in authenticated chunks; upload errors stay inside the page",
     "PASS: PassWall opens and navigates its native LuCI fixture inside HigoOS using the same LuCI session",
+    "PASS: device remarks save and reload independently of device name through the authenticated API fixture, then clear",
+    "PASS: GEO and China route update buttons submitted only their own target, with no settings reload",
     "PASS: previous HigoOS URL still renders its settings tab without browser errors",
     "PASS: Configuration files tab rendered with no profiles; upload and creation switched in one menu and navigation worked in both directions",
     `API probes: ${apiRequests.join(", ")}`,

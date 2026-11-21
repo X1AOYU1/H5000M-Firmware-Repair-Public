@@ -42,20 +42,42 @@ def patch_backup(root: Path, views: Path):
             view.write_text(body + "\n" + tag, encoding="utf-8")
 
 
-def patch_update_return(root: Path):
+def patch_geo_updates(root: Path):
+    sources = Path(__file__).parent
     model = root / "usr/lib/lua/luci/model/cbi/openclash/settings.lua"
     source = model.read_text(encoding="utf-8")
-    redirect = 'HTTP.redirect(DISP.build_url("admin", "services", "openclash"))'
-    stay = 'HTTP.redirect(DISP.build_url("admin", "services", "openclash", "settings"))'
-    for command in (*(f"openclash_geo.sh {name}" for name in ("ipdb", "geoip", "geosite", "geoasn")), "openclash_chnroute.sh"):
+    for kind in ("ipdb", "geoip", "geosite", "geoasn", "chnroute"):
+        command = "openclash_chnroute.sh" if kind == "chnroute" else f"openclash_geo.sh {kind}"
         queue = f'SYS.call("/usr/share/openclash/{command} >/dev/null 2>&1 &")'
-        anchor = queue + "\n\t" + redirect
-        updated = queue + "\n\t" + stay
-        if source.count(anchor) == 1:
-            source = source.replace(anchor, updated, 1)
+        anchor = (r'o\.inputstyle = "reload"\no\.write = function\(\)\n'
+                  r'\tm\.uci:set\("openclash", "config", "enable", 1\)\n'
+                  r'\tm\.uci:commit\("openclash"\)\n\t' + re.escape(queue) +
+                  r'\n\tHTTP\.redirect\(DISP\.build_url\("admin", "services", "openclash"(?:, "settings")?\)\)\nend')
+        updated = f'o.template = "openclash/h5000m_geo_update"\no.h5000m_update_kind = "{kind}"'
+        if len(re.findall(anchor, source)) == 1:
+            source = re.sub(anchor, lambda _: updated, source, count=1)
         elif source.count(updated) != 1:
             raise SystemExit(f"ERROR: native OpenClash update action changed: {command}")
+    source = re.sub(r'o\.description = translate\("Custom (?:GeoIP MMDB|GeoIP Dat|GeoSite Data|Geo ASN Data|Chnroute6? Lists) URL, Click Button Below To Refresh After Edit"\)',
+                    'o.description = "修改更新地址后，请先提交设置。"', source)
     model.write_text(source, encoding="utf-8")
+    controller = root / "usr/lib/lua/luci/controller/openclash.lua"
+    code = controller.read_text(encoding="utf-8")
+    route = ('entry({"admin", "services", "openclash", "geo_update_row"}, '
+             'post("action_h5000m_geo_update")).acl_depends = { "luci-app-openclash" }')
+    if route not in code:
+        anchor = 'entry({"admin", "services", "openclash", "backup"}, call("action_backup"))'
+        if code.count(anchor) != 1:
+            raise SystemExit("ERROR: cannot register OpenClash GEO update endpoint")
+        code = code.replace(anchor, anchor + "\n\t" + route, 1)
+        code += "\n" + (sources / "luci-openclash-geo-update.lua").read_text(encoding="utf-8")
+        controller.write_text(code, encoding="utf-8")
+    view = root / "usr/lib/lua/luci/view/openclash/h5000m_geo_update.htm"
+    view.write_text(
+        (sources / "luci-openclash-geo-update.htm").read_text(encoding="utf-8") +
+        "\n<script>\n" + (sources / "luci-openclash-geo-update.js").read_text(encoding="utf-8") + "</script>\n",
+        encoding="utf-8",
+    )
 
 
 def patch(root: Path):
@@ -129,7 +151,7 @@ def patch(root: Path):
     if not all(f'data-openclash-style="{name}"' in status for name in ("oc-common.css", "oc-client.css")):
         raise SystemExit("ERROR: native OpenClash status styles are missing")
     patch_backup(root, views)
-    patch_update_return(root)
+    patch_geo_updates(root)
     print("PASS: native GEO and China route updates return to the settings page")
     print("PASS: native OpenClash backup forms use the authenticated LuCI chunk upload route")
     print("PASS: LuCI authenticates through its normal login and native OpenClash ships its page styles")

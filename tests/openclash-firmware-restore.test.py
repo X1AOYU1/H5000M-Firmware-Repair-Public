@@ -96,21 +96,30 @@ end
         print(f"PASS: packed ARM64 BusyBox restored both YAML profiles from .{extension}; a failed write cannot report success")
 
     settings = (root / "usr/lib/lua/luci/model/cbi/openclash/settings.lua").read_text(encoding="utf-8")
+    controller = (root / "usr/lib/lua/luci/controller/openclash.lua").read_text(encoding="utf-8")
+    updater = controller[controller.index("function action_h5000m_geo_update()"):]
+    assert 'post("action_h5000m_geo_update")' in controller
     for mode in ("ipdb", "geoip", "geosite", "geoasn", "chnroute"):
         command = "openclash_chnroute.sh" if mode == "chnroute" else f"openclash_geo.sh {mode}"
-        queue = f'/usr/share/openclash/{command} >/dev/null 2>&1 &'
-        call = settings.index(f'SYS.call("{queue}")')
-        callback = settings[settings.rindex("o.write = function()", 0, call):settings.index("\nend", call) + 4]
+        queue = f'/usr/share/openclash/{command} </dev/null >/dev/null 2>&1 &'
+        assert settings.count(f'o.h5000m_update_kind = "{mode}"') == 1
         test.write_text(r'''
-local o, queued, destination = {}, nil, nil
-local m = {uci = {set = function() end, commit = function() end}}
+local queued, status, result
 local SYS = { call = function(command) queued = command; return 0 end }
-local DISP = { build_url = function(...) return table.concat({...}, "/") end }
-local HTTP = { redirect = function(path) destination = path end }
-''' + callback + r'''
-o.write()
+local HTTP = {
+    formvalue = function(key) assert(key == "kind"); return arg[2] end,
+    prepare_content = function(kind) assert(kind == "application/json") end,
+    status = function(code) status = code end,
+    write_json = function(data) result = data end
+}
+''' + updater + r'''
+action_h5000m_geo_update()
 assert(queued == arg[1], "requested database updater was not started")
-assert(destination == "admin/services/openclash/settings", "update left plugin settings")
+assert(result.status == "queued" and result.kind == arg[2] and not status)
+queued = nil
+arg[2] = "invalid"
+action_h5000m_geo_update()
+assert(not queued and status == 400)
 ''', encoding="utf-8")
-        subprocess.run(["lua5.1", str(test), queue], check=True)
-    print("PASS: all GEO and China route update buttons launch their updater and return to the native settings page")
+        subprocess.run(["lua5.1", str(test), queue, mode], check=True)
+    print("PASS: every GEO and China route update target launches only the corresponding updater")

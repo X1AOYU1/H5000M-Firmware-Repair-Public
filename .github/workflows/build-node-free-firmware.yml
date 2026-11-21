@@ -83,6 +83,8 @@ jobs:
           retention-days: 7
       - name: Restore both profiles with the packed ARM64 BusyBox
         run: sudo python3 tests/openclash-firmware-restore.test.py output/final-root
+      - name: Test device remarks with the packed ARM64 ucode
+        run: sudo python3 tests/higoos-device-remarks.test.py output/final-root
       - name: Dynamically click OpenClash app-center entry
         id: openclash_browser_audit
         env:
@@ -93,7 +95,7 @@ jobs:
           sudo install -m 0644 output/final-root/usr/lib/lua/luci/view/openclash/status.htm "$AUDIT_DIR/native-status.htm"
           sudo install -m 0644 output/final-root/usr/lib/lua/luci/view/openclash/upload.htm "$AUDIT_DIR/native-upload.htm"
           set +e
-          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" "$AUDIT_DIR/native-status.htm" "$AUDIT_DIR/native-upload.htm" > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
+          node tests/openclash-entry-browser.test.mjs output/final-root/usr/share/higoros/web "$AUDIT_DIR/openclash-entry-browser.txt" "$AUDIT_DIR/native-status.htm" "$AUDIT_DIR/native-upload.htm" output/final-root/usr/lib/lua/luci/view/openclash/h5000m_geo_update.htm > "$AUDIT_DIR/openclash-entry-browser-process.log" 2>&1
           result=$?
           if [ ! -f "$AUDIT_DIR/openclash-entry-browser.txt" ]; then
             cp "$AUDIT_DIR/openclash-entry-browser-process.log" "$AUDIT_DIR/openclash-entry-browser.txt"
@@ -143,7 +145,8 @@ jobs:
           body: >-
             Built from the complete repair baseline. OpenClash and PassWall
             open native LuCI inside the HigoOS layout. OpenClash backup imports
-            restore and verify profiles, and GEO updates return to settings. The previous HigoOS address
+            restore and verify profiles, and each GEO update runs without reloading settings.
+            Device notes are stored independently of device names. The previous HigoOS address
             remains available with filtered backup import;
             proxy nodes and subscription credentials were removed. Other
             firmware repairs and H5000M upgrade metadata were verified.

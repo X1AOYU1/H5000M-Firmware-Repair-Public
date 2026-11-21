@@ -20,8 +20,9 @@ python3 scripts/patch-native-openclash-ui.py "$OUT/rootfs" | tee "$OUT/native-op
 python3 scripts/patch-higoros-openclash-bulk-latency.py "$OUT/rootfs" | tee "$OUT/openclash-bulk-latency.txt"
 python3 scripts/patch-openclash-meta-core-link.py "$OUT/rootfs" | tee "$OUT/openclash-meta-core-link.txt"
 
-# Apply the current login-page fix and revise every SPA asset URL afterward.
+# Revise every SPA asset URL after the remaining UI patches.
 python3 scripts/patch-higoros-login-wallpaper.py "$OUT/rootfs" | tee "$OUT/login-wallpaper-fix.txt"
+python3 scripts/patch-higoros-device-remarks.py "$OUT/rootfs"
 python3 scripts/revision-higoros-web-assets.py "$OUT/rootfs" | tee "$OUT/frontend-asset-revision.txt"
 
 python3 - "$OUT/rootfs" <<'PY'
@@ -36,6 +37,7 @@ login = next(assets.glob("LoginPage-*.js")).read_text(encoding="utf-8")
 native = next(assets.glob("NativeConfigSection*.js")).read_text(encoding="utf-8")
 network = next(assets.glob("NetworkPage-*.js")).read_text(encoding="utf-8")
 security = next(assets.glob("SecurityPage-*.js")).read_text(encoding="utf-8")
+devices = next(assets.glob("DevicesPage-*.js")).read_text(encoding="utf-8")
 next(assets.glob("SystemPage-*.js"))
 openclash_page = next(assets.glob("OpenClashPage-*.js"))
 openclash_lua = (root / "usr/lib/lua/luci/openclash.lua").read_text(encoding="utf-8")
@@ -63,6 +65,7 @@ checks = {
     "Meta core canonical executable link repaired": all(value in openclash_subscribe for value in ('ensure_meta_core_compat_link()', 'ensure_meta_core_compat_link || {', '/etc/openclash/core/clash_meta', '/tmp/etc/openclash/core/clash_meta')) and 'ln -s "$TARGET_CORE_PATH" /etc/openclash/clash' in openclash_core_update,
     "WAN and IPv6 edit controls": all(value in network for value in ('key:"dhcp"', 'key:"static"', 'key:"pppoe"', 'key:"ds-lite"', "ipv6Types", "saveWANConfig", "saveIPv6Config")),
     "password policy controls": all(value in security for value in ("requireNumber", "requireLowercase", "requireUppercase", "requireSpecialChar", "密码策略已保存")),
+    "device remarks": "createDeviceRemark" in devices and (root / "usr/share/luci/menu.d/higoos-device-remarks.json").is_file(),
     "appearance settings UI": package is not None and "LuCI" in package.read_text(encoding="utf-8"),
     "package market UI": package is not None,
 }
