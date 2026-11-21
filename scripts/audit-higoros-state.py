@@ -24,15 +24,27 @@ for name, minor in [('null', 3), ('urandom', 9), ('random', 8)]:
     device = root / 'dev' / name
     if not device.exists():
         os.mknod(device, 0o20666, os.makedev(1, minor))
+(root / 'tmp/audit-lan.lua').write_text('''
+local ubus = require "ubus"
+local uloop = require "uloop"
+uloop.init()
+local conn = assert(ubus.connect())
+assert(conn:add({ ["network.interface.lan"] = { status = { function(req, msg)
+  conn:reply(req, { up=true, pending=false, available=true, device="auditlan0", l3_device="auditlan0", proto="static", ["ipv4-address"]={{address="192.0.2.1",mask=24}} })
+end, {} } } }))
+uloop.run()
+''')
 services = []
 service_logs = []
-for binary in ['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd']:
+for binary in ['/sbin/ubusd', '/sbin/rpcd', '/usr/bin/lua']:
     log = open(root / ('tmp/audit-' + binary.rsplit('/', 1)[-1] + '.log'), 'w+')
     service_logs.append(log)
-    services.append(subprocess.Popen(['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary], env=env, stdout=log, stderr=log))
+    command = ['chroot', str(root), '/usr/bin/qemu-aarch64-static', binary]
+    if binary == '/usr/bin/lua': command.append('/tmp/audit-lan.lua')
+    services.append(subprocess.Popen(command, env=env, stdout=log, stderr=log))
     time.sleep(1)
 print('ubusd/rpcd/netifd running:', [p.poll() is None for p in services])
-for name, service in zip(['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd'], services):
+for name, service in zip(['/sbin/ubusd', '/sbin/rpcd', '/usr/bin/lua'], services):
     if service.poll() is not None:
         print('service exited:', name, service.returncode)
 for args in [['list'], ['call', 'network.interface.lan', 'status']]:
@@ -83,7 +95,7 @@ finally:
     print('daemon diagnostic failures (last 80):')
     for line in failures[-80:]: print(line[:350])
     daemon_log.close()
-    for name, log in zip(['/sbin/ubusd', '/sbin/rpcd', '/sbin/netifd'], service_logs):
+    for name, log in zip(['/sbin/ubusd', '/sbin/rpcd', '/usr/bin/lua'], service_logs):
         log.flush(); log.seek(0)
         print('service log:', name, log.read()[-4000:])
         log.close()
