@@ -80,6 +80,10 @@ jobs:
         run: |
           node scripts/test-uplink-security.mjs
           node --check output/final-root/usr/share/higoros/web/assets/WirelessShellPage-*.js
+      - name: Test dashboard refresh intervals in the packed SPA
+        env:
+          PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+        run: node tests/higoros-dashboard-refresh-browser.test.mjs output/final-root/usr/share/higoros/web
       - name: Inspect wireless repeater password controls
         run: |
           python3 - <<'PY'

@@ -87,17 +87,18 @@ def patch(root: Path) -> None:
         body = 'import{inferDeviceType}from"./higoos-device-type.js";' + body.replace(type_anchor, type_replacement, 1)
         page.write_text(body, encoding="utf-8")
 
-    # Fetch the list and traffic ranking as a single batch so both queries see
-    # the same refresh cycle. Keep failures independent for the two panels.
+    # Deduplicate only active requests. A four-second response cache made the
+    # dashboard's two-second refresh return stale devices; waiting for both
+    # endpoints also let slow traffic ranking block the device list.
     queries = list(assets.glob("devices.queries-*.js"))
     if len(queries) != 1:
         raise SystemExit("ERROR: expected one device query asset")
     query = queries[0]
     source = query.read_text(encoding="utf-8")
-    batch = ('let h5000mBatch,h5000mBatchAt=0;const h5000mFetch=i=>{'
-             'const now=Date.now();if(!h5000mBatch||now-h5000mBatchAt>4000){'
-             'h5000mBatchAt=now;h5000mBatch=Promise.allSettled([y.getDevices(),y.getTrafficRanking()])}'
-             'return h5000mBatch.then(results=>{const r=results[i];if(r.status==="rejected")throw r.reason;return r.value})};')
+    batch = ('const h5000mInFlight=[];const h5000mFetch=i=>{'
+             'if(!h5000mInFlight[i])h5000mInFlight[i]=Promise.resolve()'
+             '.then(()=>i===0?y.getDevices():y.getTrafficRanking())'
+             '.finally(()=>{h5000mInFlight[i]=null});return h5000mInFlight[i]};')
     if 'const h5000mFetch=i=>' not in source:
         anchor = 'h=5e3,re=(e=!0)=>m({'
         if source.count(anchor) != 1 or source.count('queryFn:()=>y.getDevices()') != 1 or source.count('queryFn:()=>y.getTrafficRanking()') != 1:
