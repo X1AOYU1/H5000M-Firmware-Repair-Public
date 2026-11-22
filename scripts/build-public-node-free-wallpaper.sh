@@ -199,7 +199,7 @@ mkdir -p "$OUT/final-tar"
 tar -xf "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin" -C "$OUT/final-tar"
 final_root="$(find "$OUT/final-tar" -type f -name root -print -quit)"
 unsquashfs -no-progress -d "$OUT/final-root" "$final_root" >/dev/null
-grep -q 'higoos-login-wallpaper\.' "$OUT/final-root/usr/share/higoros/web/assets/"LoginPage-*.js
+grep -q 'higoos_argon_login_wallpaper' "$OUT/final-root/usr/share/higoros/web/assets/"LoginPage-*.js
 python3 - "$OUT/final-root" <<'PY'
 from pathlib import Path
 import sys
@@ -207,7 +207,13 @@ import sys
 root = Path(sys.argv[1])
 assets = root / "usr/share/higoros/web/assets"
 plugins = next(assets.glob("PluginsPage-*.js")).read_text(encoding="utf-8")
-router = next(path.read_text(encoding="utf-8") for path in assets.glob("index-*.js") if 'path:"apps/openclash"' in path.read_text(encoding="utf-8"))
+router_candidates = [
+    path.read_text(encoding="utf-8") for path in assets.glob("index-*.js")
+    if "DashboardPage" in path.read_text(encoding="utf-8")
+    and "DevicesPage" in path.read_text(encoding="utf-8")
+]
+assert len(router_candidates) == 1, f"expected one HigoOS router entry, found {len(router_candidates)}"
+router = router_candidates[0]
 assert 'to:{path:"/apps/openclash-luci"}' in plugins
 assert 'path:"apps/openclash"' in router
 assert 'path:"apps/openclash-luci"' in router
