@@ -18,8 +18,10 @@ with tempfile.TemporaryDirectory() as temporary:
         'return i("div",Y,[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"})),e("div",{class:"w-full rounded-xl bg-white shadow-lg"},[])])}}',
         encoding="utf-8",
     )
-    entry = assets / "index-fixture.js"
-    entry.write_text('const router={path:"apps/openclash"};', encoding="utf-8")
+    entry = assets / "index-main-fixture.js"
+    entry.write_text('const routes=[DashboardPage,DevicesPage];', encoding="utf-8")
+    secondary_entry = assets / "index-secondary-fixture.js"
+    secondary_entry.write_text('const widget={name:"other"};', encoding="utf-8")
     native = assets / "NativeConfigSection-fixture.js"
     native.write_text(
         'const{query:s,upload:l,remove:o}=Fe(),v=V(null),u=V(null),i=V(""),y=V(!1),S=V(null),N=V(!1),'
@@ -82,6 +84,8 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit("ERROR: patch did not copy the standalone crop module into web assets")
     if 'import"./higoos-wallpaper-source.js";' not in entry.read_text(encoding="utf-8"):
         raise SystemExit("ERROR: wallpaper source switching listener is not loaded globally")
+    if 'import"./higoos-wallpaper-source.js";' in secondary_entry.read_text(encoding="utf-8"):
+        raise SystemExit("ERROR: wallpaper source listener was added to a secondary index bundle")
     source_module = assets / "higoos-wallpaper-source.js"
     if not source_module.is_file() or "clearUploadedWallpaperOnSourceChange" not in source_module.read_text(encoding="utf-8"):
         raise SystemExit("ERROR: choosing another wallpaper source does not clear the upload override")

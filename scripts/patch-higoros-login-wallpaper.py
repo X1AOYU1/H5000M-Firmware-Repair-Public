@@ -17,9 +17,17 @@ if len(login_pages) != 1 or len(native_pages) != 1:
 login_path = login_pages[0]
 login = login_path.read_text(encoding="utf-8")
 entry_pages = sorted(assets.glob("index-*.js"))
-if len(entry_pages) != 1:
-    raise SystemExit(f"ERROR: expected one HigoOS SPA entry bundle, found {len(entry_pages)}")
-entry_path = entry_pages[0]
+entry_candidates = [
+    path for path in entry_pages
+    if "DashboardPage" in path.read_text(encoding="utf-8")
+    and "DevicesPage" in path.read_text(encoding="utf-8")
+]
+if len(entry_candidates) != 1:
+    raise SystemExit(
+        f"ERROR: expected one HigoOS SPA router entry bundle, found {len(entry_candidates)} "
+        f"among {len(entry_pages)} index bundles"
+    )
+entry_path = entry_candidates[0]
 entry = entry_path.read_text(encoding="utf-8")
 source_import = 'import"./higoos-wallpaper-source.js";'
 if source_import not in entry:
