@@ -43,7 +43,14 @@ def patch(root):
     body = replace(body, 'const h5000mDeviceRemark=createDeviceRemark(',
         'const h5000mDeviceHistory=createDeviceHistory({defineComponent:Z,h:Be,ref:M,Modal:N,Button:V});const h5000mDeviceRemark=createDeviceRemark(')
     card = 'r(h5000mDeviceRemark,{mac:t.macAddress,name:t.name},null,8,["mac","name"])'
-    body = replace(body, card, card + ',r(h5000mDeviceHistory,{device:t},null,8,["device"])')
+    history = 'r(h5000mDeviceHistory,{device:t},null,8,["device"])'
+    controls = 'e("div",{class:"mt-1 flex h-7 min-w-0 items-center justify-between gap-2 overflow-hidden"},[' + card + ',' + history + '])'
+    if controls not in body:
+        siblings = card + ',' + history
+        if siblings in body:
+            body = body.replace(siblings, controls, 1)
+        else:
+            body = replace(body, card, controls)
     if 'import{createDeviceHistory}' not in body:
         body = 'import{createDeviceHistory}from"./higoos-device-history.js";' + body
     page.write_text(body, encoding="utf-8")

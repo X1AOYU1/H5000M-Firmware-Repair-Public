@@ -48,6 +48,11 @@ with tempfile.TemporaryDirectory() as temporary:
         'wallpaper.value?i("img",{src:wallpaper.value',
         'h5000m-wallpaper-transparent',
         'new MutationObserver(q)',
+        'lightWallpaper=(.2126*d[0]+.7152*d[1]+.0722*d[2])>150',
+        'background:rgba(15,23,42,.56)!important;backdrop-filter:blur(14px)!important',
+        'background:rgba(255,255,255,.86)!important;backdrop-filter:blur(14px)!important',
+        'h5000m-wallpaper-light .login-input{background:rgba(255,255,255,.78)!important',
+        'h5000m-wallpaper-light .text-txt-1',
         'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent',
         'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent',
         'if(!wallpaper.value){activeCard?.classList.remove("h5000m-wallpaper-transparent")',
@@ -86,7 +91,6 @@ crop_source = crop_module.read_text(encoding="utf-8")
 required_crop = (
     'mountHigoosWallpaperCrop({upload:file=>l.mutateAsync',
     'higoos-cropped-wallpaper-${Date.now()}.jpg',
-    'new MutationObserver(addButtons)',
     '保存裁切并应用',
     'pointermove',
     'canvas.toBlob',
@@ -94,6 +98,10 @@ required_crop = (
 )
 if any(marker not in native_source + crop_source for marker in required_crop):
     raise SystemExit("ERROR: crop controls are not connected to the native upload API")
+if '裁切登录壁纸' in crop_source or 'addButtons' in crop_source:
+    raise SystemExit("ERROR: post-upload wallpaper crop controls must not be shown")
+if 'window.higoosCropBeforeUpload(u.value)' not in native_source:
+    raise SystemExit("ERROR: wallpaper must be cropped before upload")
 
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)

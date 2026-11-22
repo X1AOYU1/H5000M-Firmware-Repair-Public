@@ -28,10 +28,12 @@ login_probe = (
     '(()=>{const p=[];try{const w=localStorage.getItem("higoos_argon_login_wallpaper");'
     'if(w&&w.startsWith("/luci-static/argon/background/"))p.push(w)}catch{}'
     'p.push(...["webp","png","jpg","jpeg","gif"].map(e=>"/luci-static/argon/background/higoos-login-wallpaper."+e));'
-    'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>wallpaper.value=w+"?v="+Date.now();'
-    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo,activeCard,styleTag;const q=()=>{'
+    'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>{try{const c=document.createElement("canvas");'
+    'c.width=c.height=1;const x=c.getContext("2d");x.drawImage(image,0,0,1,1);const d=x.getImageData(0,0,1,1).data;'
+    'lightWallpaper=(.2126*d[0]+.7152*d[1]+.0722*d[2])>150}catch{lightWallpaper=false}wallpaper.value=w+"?v="+Date.now()};'
+    'image.onerror=n;image.src=w+"?v="+Date.now()};n();let mo,activeCard,styleTag,lightWallpaper=false;const q=()=>{'
     'if(!wallpaper.value){activeCard?.classList.remove("h5000m-wallpaper-transparent");'
-    'document.querySelector(".min-h-screen.h5000m-wallpaper-active")?.classList.remove("h5000m-wallpaper-active");styleTag?.remove();'
+    'document.querySelector(".min-h-screen.h5000m-wallpaper-active")?.classList.remove("h5000m-wallpaper-active","h5000m-wallpaper-light");styleTag?.remove();'
     'activeCard=null;styleTag=null;return}const card=document.querySelector(".router-card.login-card");if(!card)return;'
     'const page=card.closest(".min-h-screen");'
     'if(!styleTag){styleTag=document.createElement("style");styleTag.textContent='
@@ -46,6 +48,15 @@ login_probe = (
     '.router-card.login-card.h5000m-wallpaper-transparent:before,'+
     '.router-card.login-card.h5000m-wallpaper-transparent:after,'+
     '.h5000m-wallpaper-active .login-glow{display:none!important}\';'
+    'styleTag.textContent+=\'html[data-theme="light"] .h5000m-wallpaper-active .router-card.login-card.h5000m-wallpaper-transparent,'+
+    'html[data-theme="dark"] .h5000m-wallpaper-active .router-card.login-card.h5000m-wallpaper-transparent{'
+    'background:rgba(15,23,42,.56)!important;backdrop-filter:blur(14px)!important;'
+    '-webkit-backdrop-filter:blur(14px)!important;border-color:rgba(255,255,255,.22)!important;'
+    'box-shadow:0 12px 40px #0005!important}'+
+    'html[data-theme="light"] .h5000m-wallpaper-active.h5000m-wallpaper-light .router-card.login-card.h5000m-wallpaper-transparent{'
+    'background:rgba(255,255,255,.86)!important;backdrop-filter:blur(14px)!important;'
+    '-webkit-backdrop-filter:blur(14px)!important;border-color:rgba(15,23,42,.22)!important;'
+    'box-shadow:0 12px 40px #0f172a35!important}\';'
     'styleTag.textContent+=\' .h5000m-wallpaper-active .text-txt-1,'+
     '.h5000m-wallpaper-active .text-txt-2,.h5000m-wallpaper-active .text-txt-4{color:#fff!important;'+
     'text-shadow:0 1px 2px #000b}'+
@@ -54,9 +65,17 @@ login_probe = (
     'html[data-theme="light"] .h5000m-wallpaper-active .login-input{background:transparent!important;'+
     'text-shadow:0 1px 3px #000,0 0 5px #000!important}'+
     '.h5000m-wallpaper-active .login-input::placeholder{color:#d1d5db!important;opacity:1}'+
-    '.h5000m-wallpaper-active .login-input:focus{outline:2px solid #fff!important;outline-offset:2px}\';'
+    '.h5000m-wallpaper-active .login-input:focus{outline:2px solid #fff!important;outline-offset:2px}'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-1,'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-2,'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-4{color:#172033!important;text-shadow:0 1px 2px #fff!important}'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .login-input{background:rgba(255,255,255,.78)!important;'
+    'color:#111827!important;border-color:rgba(15,23,42,.55)!important;text-shadow:none!important}'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .login-input::placeholder{color:#475569!important;opacity:1}'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .login-input:focus{outline:2px solid #2563eb!important;outline-offset:2px}\';'
     'document.head.append(styleTag)}if(activeCard&&activeCard!==card)activeCard.classList.remove("h5000m-wallpaper-transparent");'
-    'activeCard=card;card.classList.add("h5000m-wallpaper-transparent");page?.classList.add("h5000m-wallpaper-active")};q();'
+    'activeCard=card;card.classList.add("h5000m-wallpaper-transparent");page?.classList.add("h5000m-wallpaper-active");'
+    'page?.classList.toggle("h5000m-wallpaper-light",lightWallpaper)};q();'
     'mo=new MutationObserver(q);mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["data-theme"]})})()'
 )
 mounted_replacement = (

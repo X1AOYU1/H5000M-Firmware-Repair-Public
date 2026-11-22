@@ -10,7 +10,7 @@ const js = await readFile('scripts/higoos-wallpaper-crop.js');
 const server = createServer((req, res) => {
   if (req.url === '/crop.js') { res.writeHead(200, {'Content-Type': 'text/javascript'}); res.end(js); return; }
   res.writeHead(200, {'Content-Type':'text/html', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"});
-  res.end('<html><head></head><body><script type="module" src="/crop.js"></script></body></html>');
+  res.end('<html><head></head><body><table><tr><td>higoos-cropped-wallpaper-1795324169501.jpg</td></tr></table><script type="module" src="/crop.js"></script></body></html>');
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch({headless:true});
@@ -18,6 +18,8 @@ try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   await page.evaluate(async () => { const m = await import('/crop.js'); m.mountHigoosWallpaperCrop({upload: async () => {}}); });
+  assert.equal(await page.getByRole('button', {name:'裁切登录壁纸'}).count(), 0,
+    'uploaded wallpaper rows no longer get a second crop action');
   const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ioAAAAASUVORK5CYII=';
   await page.evaluate(b64 => {
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));

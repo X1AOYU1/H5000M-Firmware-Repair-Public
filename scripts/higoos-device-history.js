@@ -74,7 +74,7 @@ export function createDeviceHistory({defineComponent,h,ref,Modal,Button}) {
         show.value=false;
       } catch(cause) {error.value=cause.message;} finally {busy.value=false;}
     }
-    return ()=>!props.device.isOnline && keyOf(props.device.macAddress) ? h('div',{class:'mt-1'},[
+    return ()=>!props.device.isOnline && keyOf(props.device.macAddress) ? h('div',{class:'flex h-full shrink-0 items-center'},[
       h('button',{type:'button',class:'text-xs text-txt-3 hover:underline',onClick:()=>{show.value=true;error.value='';}},'清理离线记录'),
       show.value?h(Modal,{modelValue:true,'onUpdate:modelValue':v=>{if(!busy.value)show.value=v;},title:'清理离线记录',size:'sm'},{
         default:()=>[

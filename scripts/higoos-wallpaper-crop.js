@@ -3,7 +3,7 @@ export function mountHigoosWallpaperCrop({upload}) {
   window.__higoosWallpaperCropMounted = true;
   const prefix = "/luci-static/argon/background/";
   const style = document.createElement("style");
-  style.textContent = `.higoos-crop-button{margin-left:.5rem;padding:.25rem .6rem;border:1px solid #64748b;border-radius:.35rem;background:#fff;color:#1e293b;cursor:pointer}.higoos-crop-shade{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:#020617bb;padding:1rem}.higoos-crop-dialog{width:min(900px,96vw);max-height:94vh;overflow:auto;border-radius:.8rem;background:#fff;padding:1rem;color:#0f172a;box-shadow:0 20px 60px #0008}.higoos-crop-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#111827;touch-action:none;cursor:move}.higoos-crop-preview img{position:absolute;max-width:none;user-select:none;pointer-events:none}.higoos-crop-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}.higoos-crop-controls label{display:grid;gap:.25rem;font-size:.9rem}.higoos-crop-actions{display:flex;justify-content:flex-end;gap:.6rem}.higoos-crop-actions button{padding:.55rem .9rem;border-radius:.4rem;border:1px solid #64748b;cursor:pointer}.higoos-crop-status{min-height:1.4em;color:#b91c1c}@media(max-width:600px){.higoos-crop-controls{grid-template-columns:1fr}}`;
+  style.textContent = `.higoos-crop-shade{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:#020617bb;padding:1rem}.higoos-crop-dialog{width:min(900px,96vw);max-height:94vh;overflow:auto;border-radius:.8rem;background:#fff;padding:1rem;color:#0f172a;box-shadow:0 20px 60px #0008}.higoos-crop-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#111827;touch-action:none;cursor:move}.higoos-crop-preview img{position:absolute;max-width:none;user-select:none;pointer-events:none}.higoos-crop-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}.higoos-crop-controls label{display:grid;gap:.25rem;font-size:.9rem}.higoos-crop-actions{display:flex;justify-content:flex-end;gap:.6rem}.higoos-crop-actions button{padding:.55rem .9rem;border-radius:.4rem;border:1px solid #64748b;cursor:pointer}.higoos-crop-status{min-height:1.4em;color:#b91c1c}@media(max-width:600px){.higoos-crop-controls{grid-template-columns:1fr}}`;
   document.head.append(style);
 
   const showEditor = (name, file = null) => new Promise(resolve => {
@@ -101,20 +101,4 @@ export function mountHigoosWallpaperCrop({upload}) {
   });
   window.higoosCropBeforeUpload = file => /\.(?:jpe?g|png|webp)$/i.test(file.name) ? showEditor(file.name, file) : Promise.resolve(file);
 
-  const addButtons = () => {
-    document.querySelectorAll("tr").forEach(row => {
-      const cell = row.querySelector("td");
-      if (!cell || row.querySelector(".higoos-crop-button")) return;
-      const text = cell.textContent.trim();
-      if (!/\.(?:jpe?g|png|webp)$/i.test(text) || text.startsWith("higoos-login-wallpaper.")) return;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "higoos-crop-button";
-      button.textContent = "裁切登录壁纸";
-      button.addEventListener("click", () => showEditor(text));
-      cell.append(button);
-    });
-  };
-  addButtons();
-  new MutationObserver(addButtons).observe(document.body, {childList:true,subtree:true});
 }
