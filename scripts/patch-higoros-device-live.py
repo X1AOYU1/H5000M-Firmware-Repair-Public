@@ -45,7 +45,7 @@ def patch(root):
     card = 'r(h5000mDeviceRemark,{mac:t.macAddress,name:t.name},null,8,["mac","name"])'
     history = 'r(h5000mDeviceHistory,{device:t},null,8,["device"])'
     outer_card = 'class:n(["relative overflow-hidden p-4 rounded-xl glass-effect",v.value])'
-    outer_card_flex = outer_card + ',style:{height:"100%",display:"flex",flexDirection:"column"}'
+    outer_card_flex = outer_card + ',style:{alignSelf:"stretch",display:"flex",flexDirection:"column"}'
     if outer_card_flex not in body:
         body = replace(body, outer_card, outer_card_flex)
     inner_card = 'Vs={class:"relative z-10"}'
