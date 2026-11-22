@@ -11,23 +11,24 @@ const assets = await readdir(join(root,'assets'));
 const entry = assets.find(x=>x.startsWith('index-DhOCiPK2'));
 const charts = assets.find(x=>x.startsWith('charts-Dg-AV5Yx'));
 const mac = 'C6:AC:9F:F6:94:22';
+const linkMac = '0a:f1:b0:c0:40:9a';
 const phone = {id:'audit-phone',name:'Yu-de-S24-Ultra',deviceType:'other',osType:'android',
   macAddress:mac,ipAddress:'10.0.0.4',connectionType:'wifi',isOnline:true,
   connectedTime:100,downloadSpeed:1,uploadSpeed:1,trafficToday:100,
-  connectionDetail:{kind:'wifi-mlo',iface:'phy1-ap0',signalDbm:-45,rxRateMbps:2594,txRateMbps:2161}};
-let stage = 'online', snapshots = 0;
+  connectionDetail:{kind:'wifi-mlo',iface:'phy1-ap0',linkMac,signalDbm:-45,rxRateMbps:2594,txRateMbps:2161}};
+let stage = 'discovering', snapshots = 0, deviceRequests = 0;
 const errors = [];
 const server = createServer(async(req,res)=>{
   const url = new URL(req.url,'http://localhost');
   if (url.pathname.endsWith('/device_wireless')) {
     snapshots++;
-    const data = {complete:true,interfaces:[{iface:'phy1-ap0',band:'wifi-5g',clients:stage==='online'?[{mac,signalDbm:-45}]:{}}]};
+    const data = {complete:true,interfaces:[{iface:'phy1-ap0',band:'wifi-5g',clients:stage!=='offline'?[{mac:linkMac,signalDbm:-45}]:{}}]};
     return res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(data));
   }
   if (url.pathname.startsWith('/api/v1/')) {
     let data = {};
     if (url.pathname==='/api/v1/auth/me') data={username:'audit',role:'admin',permissions:['*']};
-    else if (url.pathname==='/api/v1/devices') data=[phone]; // deliberately stale online status
+    else if (url.pathname==='/api/v1/devices') { deviceRequests++; data=stage==='discovering'?[]:[{...phone,isOnline:stage!=='reconnecting'}]; }
     else if (url.pathname==='/api/v1/devices/audit-phone') data=phone;
     else if (url.pathname==='/api/v1/system/info') data={uptime:100,deviceModel:'Hiveton H5000M'};
     else if (url.pathname==='/api/v1/system/features') data={modules:{wifi:{installed:true}}};
@@ -55,7 +56,14 @@ try {
   page.on('console',message=>{if(message.type()==='error') console.error('Console:',message.text());});
   page.on('response',response=>{if(response.status()>=400) console.error('HTTP',response.status(),response.url());});
   await page.goto(`http://127.0.0.1:${server.address().port}/devices`);
+  await page.waitForTimeout(2500);
+  assert.ok(deviceRequests >= 2, 'device list is polled while backend has not discovered the station');
+  assert.equal(await page.getByText(phone.name,{exact:true}).count(), 0, 'association alone does not fabricate a device');
+  stage='online';
+  const discoveredAt=Date.now();
   await page.getByText(phone.name,{exact:true}).first().waitFor().catch(async error=>{console.error('Rendered page:',await page.locator('body').innerText());throw error;});
+  console.log(`Backend record appeared in UI after ${Date.now()-discoveredAt} ms (${deviceRequests} requests)`);
+  assert.ok(Date.now()-discoveredAt<3500, 'UI renders promptly after backend discovery');
   await page.getByText('-45 dBm(极好)',{exact:true}).waitFor();
   assert.ok((await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'));
   stage='offline';
@@ -63,8 +71,11 @@ try {
   await page.waitForFunction(()=>!document.body.innerText.includes('-45 dBm'),{},{timeout:6500});
   assert.ok(Date.now()-since<6500,'offline state must not wait for the stale 30-second backend status');
   assert.ok(!(await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'),'offline card clears negotiated rate too');
-  stage='online';
+  stage='reconnecting';
   await page.getByText('-45 dBm(极好)',{exact:true}).waitFor({timeout:5000});
+  assert.ok(!(await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'),'reconnect does not display the previous session rate while backend is offline');
+  stage='online';
+  await page.getByText('↓2161 ↑2594 Mbps',{exact:true}).waitFor({timeout:5000});
   await page.locator('a[href="/network"]').first().click();
   await page.getByRole('button',{name:'网络拓扑',exact:true}).click();
   await page.locator('[_echarts_instance_]').waitFor();

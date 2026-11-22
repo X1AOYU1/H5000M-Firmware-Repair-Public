@@ -36,6 +36,22 @@ assert.equal(reconcile([phone],snapshot([]))[0].isOnline,true,'failure resets co
 assert.equal(reconcile([phone],snapshot([station]))[0].isOnline,true,'sleeping associated station stays online without traffic');
 const mlo = {...phone,macAddress:'02:00:00:00:00:01',connectionDetail:{...phone.connectionDetail,linkMac:phone.macAddress}};
 assert.equal(reconcile([mlo],snapshot([station]))[0].connectionType,'wifi-5g','MLO link MAC resolves current radio');
+// Real H5000M API shape: the wireless link has a different MAC from DHCP.
+const observedPhone = {name:'Yu-de-S24-Ultra',macAddress:'0A:F1:B0:C0:40:19',ipAddress:'10.0.0.5',
+  deviceType:'other',connectionType:'wifi',isOnline:false,
+  connectionDetail:{kind:'wifi-2g',iface:'phy0-ap0',linkMac:'0a:f1:b0:c0:40:9a',signalDbm:-39,rxRateMbps:154.8,txRateMbps:229.4}};
+const observedSnapshot = clients => ({complete:true,interfaces:[
+  {iface:'phy0-ap0',band:'wifi-2.4g',clients}, {iface:'phy1-ap0',band:'wifi-5g',clients:[]}]});
+const realCase = createDeviceReconciler(null,null);
+const absentPhone = realCase([observedPhone],observedSnapshot([]))[0];
+assert.equal(absentPhone.connectionDetail.signalDbm,undefined,'offline backend data must not display stale signal');
+assert.equal(absentPhone.connectionDetail.rxRateMbps,undefined,'offline backend data must not display stale rate');
+const reconnectedPhone = realCase([observedPhone],observedSnapshot([{mac:'0a:f1:b0:c0:40:9a',signalDbm:-37}]))[0];
+assert.equal(reconnectedPhone.isOnline,true,'associated link MAC overrides stale offline status');
+assert.equal(reconnectedPhone.deviceType,'mobile');
+assert.equal(reconnectedPhone.connectionDetail.signalDbm,-37);
+assert.equal(reconnectedPhone.connectionDetail.rxRateMbps,undefined,'do not show the previous session rate on reconnect');
+assert.equal(reconnectedPhone.connectionDetail.txRateMbps,undefined);
 const known = createDeviceReconciler()([{...phone,connectionDetail:{kind:'wifi-2g'}}],null)[0];
 assert.equal(known.connectionType,'wifi-2.4g','preserve known band if live RPC unavailable');
 const offline = reconcile([{...phone,isOnline:false}],null)[0];

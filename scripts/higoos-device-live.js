@@ -77,6 +77,10 @@ export function createDeviceReconciler(storage, identityStorage) {
         ({'wifi-2g':'wifi-2.4g', 'wifi-5g':'wifi-5g', 'wifi-6g':'wifi-6g'})[detail.kind];
       if (knownBand) state.band = knownBand;
       if (hit) {
+        // A stale offline backend record can retain the previous session's
+        // rates. Show only measurements from the current association until
+        // the backend reports the device online again.
+        if (!original.isOnline) for (const field of liveFields) delete detail[field];
         state.missing = 0;
         if (bands.has(hit.row.band)) state.band = hit.row.band;
         state.iface = hit.row.iface;
