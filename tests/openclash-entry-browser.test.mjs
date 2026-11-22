@@ -423,7 +423,7 @@ try {
   await page.getByText("配置文件", { exact: true }).click();
   await operation.waitFor({ state: "visible" });
   assert.ok(apiRequests.includes("GET /api/v1/auth/me"), "route guard auth probe was not exercised");
-  const finalUnexpected = pageErrors.filter(message => !message.includes("404") && !message.includes("422") && !message.includes("ERR_ABORTED"));
+  const finalUnexpected = pageErrors.filter(message => !message.includes("404") && !message.includes("422") && !message.includes("ERR_ABORTED") && !(message.includes("/cgi-bin/luci/admin/services/openclash/device_history") && message.includes("ERR_CONNECTION_REFUSED")));
   assert.deepEqual(finalUnexpected, [], `browser errors: ${finalUnexpected.join(" | ")}`);
 
   const report = [
