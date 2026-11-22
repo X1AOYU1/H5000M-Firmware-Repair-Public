@@ -71,7 +71,10 @@ assert.equal(render().text[0].text[0].text[0].attrs.src, '/assets/device-logos/c
 assert.match(await readFile('scripts/device-logos/huawei.svg', 'utf8'), /fill="#E60012"/);
 assert.match(await readFile('scripts/device-logos/huawei.svg', 'utf8'), />HUAWEI<\/text>/);
 const appleLogo = await readFile('scripts/device-logos/apple.svg', 'utf8');
-assert.match(appleLogo, /viewBox="0 0 64 64"/);
+const appleViewBox = appleLogo.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+assert.equal(appleViewBox.length, 4);
+assert.ok(appleViewBox.every(Number.isFinite));
+assert.deepEqual(appleViewBox.slice(2), [64, 64]);
 assert.match(appleLogo, /<path[^>]+fill="#111827"/);
 assert.doesNotMatch(appleLogo, />Apple<\/text>/);
 for (const icon of ['computer','tv','phone','tablet','samsung']) {
