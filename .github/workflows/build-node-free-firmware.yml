@@ -58,6 +58,13 @@ jobs:
         run: node tests/higoos-device-live.test.mjs
       - name: Test shared live speed sampling
         run: node tests/higoos-realtime-speed.test.mjs
+      - name: Test HigoOS mobile app assets
+        run: python3 tests/higoos-mobile-app.test.py
+      - name: Test HigoOS mobile app in browser
+        env:
+          PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+          AUDIT_DIR: ${{ runner.temp }}/higoos-ui-audit
+        run: node tests/higoos-mobile-app-browser.test.mjs scripts/higoos-mobile
       - name: Test OpenClash node cleanup
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
@@ -83,6 +90,7 @@ jobs:
       - name: Test wireless scan security mapping
         run: |
           node scripts/test-uplink-security.mjs
+          python3 tests/higoos-uplink-patch.test.py
           node --check output/final-root/usr/share/higoros/web/assets/WirelessShellPage-*.js
       - name: Test dashboard refresh intervals in the packed SPA
         env:

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101a1c">
+  <meta name="description" content="HigoOS 路由器移动管理">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./app.css">
+  <title>HigoOS 移动管理</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">H</div>
+      <div class="brand-copy"><strong>HigoOS</strong><span>路由器移动管理</span></div>
+      <button id="refresh" class="icon-button" type="button" aria-label="立即刷新" title="立即刷新">↻</button>
+    </header>
+
+    <section id="login-panel" class="panel login-panel" hidden>
+      <h1>登录路由器</h1>
+      <p class="muted">使用 HigoOS 管理账号登录。密码仅发送给当前路由器，不会保存在此 App 中。</p>
+      <form id="login-form">
+        <label>用户名<input name="username" autocomplete="username" value="root" required></label>
+        <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-button" type="submit">登录</button>
+      </form>
+      <p id="login-error" class="error" role="alert"></p>
+    </section>
+
+    <div id="dashboard" hidden>
+      <section class="router-heading">
+        <div><p class="eyebrow">路由器状态</p><h1 id="router-name">H5000M</h1></div>
+        <span id="connection-state" class="status-pill"><i></i>正在连接</span>
+      </section>
+
+      <section class="metric-grid" aria-label="系统状态">
+        <article class="metric"><span>CPU</span><strong id="cpu-value">--</strong><small id="cpu-detail">负载</small></article>
+        <article class="metric"><span>内存</span><strong id="memory-value">--</strong><small id="memory-detail">使用情况</small></article>
+        <article class="metric traffic-metric"><span>实时下载</span><strong id="download-value">--</strong><small>Mbps</small></article>
+        <article class="metric traffic-metric"><span>实时上传</span><strong id="upload-value">--</strong><small>Mbps</small></article>
+      </section>
+
+      <section class="section-heading"><h2>无线网络</h2><span id="wireless-count" class="muted">读取中</span></section>
+      <section id="wireless-list" class="wireless-list" aria-live="polite"></section>
+
+      <section class="section-heading devices-heading"><h2>连接设备</h2><a href="/devices">管理</a></section>
+      <section id="device-list" class="device-list" aria-live="polite"></section>
+
+      <section class="section-heading"><h2>快捷管理</h2></section>
+      <nav class="quick-grid" aria-label="快捷管理">
+        <a href="/wifi"><span class="quick-icon">⌁</span><span>Wi-Fi 设置</span></a>
+        <a href="/network"><span class="quick-icon">◇</span><span>网络设置</span></a>
+        <button id="reboot" type="button"><span class="quick-icon">⏻</span><span>重启路由器</span></button>
+      </nav>
+      <p id="action-message" class="action-message" role="status"></p>
+      <footer><span id="updated-at">等待首次同步</span><button id="logout" class="text-button" type="button">退出登录</button></footer>
+    </div>
+
+    <p id="global-error" class="global-error" role="alert" hidden></p>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>

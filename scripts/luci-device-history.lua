@@ -14,10 +14,13 @@ function action_higoros_device_history()
 		if origin_host and request_host and origin_host == request_host then
 			HTTP.header("Access-Control-Allow-Origin", origin)
 			HTTP.header("Access-Control-Allow-Credentials", "true")
+			HTTP.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			HTTP.header("Access-Control-Allow-Headers", "Content-Type")
 			HTTP.header("Vary", "Origin")
 		end
 		return HTTP.write_json(payload)
 	end
+	if HTTP.getenv("REQUEST_METHOD") == "OPTIONS" then return reply(200, {ok=true}) end
 	if context.authuser ~= "root" or not context.authsession or not context.authtoken then
 		return reply(403, {error="请重新登录后再试"})
 	end

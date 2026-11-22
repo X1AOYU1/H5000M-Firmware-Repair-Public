@@ -1,0 +1,13 @@
+{
+  "id": "/mobile/",
+  "name": "HigoOS 路由器管理",
+  "short_name": "HigoOS",
+  "description": "查看和管理 HigoOS 路由器",
+  "start_url": "/mobile/",
+  "scope": "/mobile/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101a1c",
+  "theme_color": "#101a1c",
+  "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

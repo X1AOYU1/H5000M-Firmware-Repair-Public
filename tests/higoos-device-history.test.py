@@ -11,13 +11,14 @@ start = source.index('function action_higoros_device_history()')
 handler = source[start:source.index('\nfunction action_backup()', start)]
 test = r'''
 local context={authuser="root",authsession="session",authtoken="csrf"}
-local files,request,fail={},nil,nil
+local files,request,fail,headers={},nil,nil,{}
 local store="/etc/higoos-forgotten-devices"
 local key="0af1b0c04019"
 package.preload["luci.dispatcher"]=function()return {context=context}end
 package.preload["luci.http"]=function()return {
- status=function(code)request.status=code end,prepare_content=function()end,header=function()end,
- getenv=function()return request.method end,formvalue=function(k)return request[k]end,
+ status=function(code)request.status=code end,prepare_content=function()end,header=function(k,v)headers[k]=v end,
+ getenv=function(k)if k=="REQUEST_METHOD"then return request.method end if k=="HTTP_ORIGIN"then return request.origin end if k=="HTTP_HOST"then return request.host end end,
+ formvalue=function(k)return request[k]end,
  write_json=function(data)request.data=data end
 }end
 package.preload["nixio.fs"]=function()return {
@@ -32,11 +33,15 @@ package.preload["nixio.fs"]=function()return {
 }end
 '''+handler+r'''
 local function run(method,action,mac,token,generation)
- request={method=method,action=action,mac=mac,token=token,generation=generation,status=200}
+ request={method=method,action=action,mac=mac,token=token,generation=generation,status=200,origin="http://router",host="router:8080"}
+ headers={}
  action_higoros_device_history();return request.status,request.data
 end
 local status,data=run("GET")
 assert(status==200 and data.token=="csrf" and next(data.markers)==nil)
+assert(headers["Access-Control-Allow-Origin"]=="http://router" and headers["Access-Control-Allow-Credentials"]=="true")
+assert(headers["Access-Control-Allow-Methods"]=="GET, POST, OPTIONS")
+assert(run("OPTIONS")==200)
 context.authuser="guest";assert(run("GET")==403);context.authuser="root"
 assert(run("DELETE")==405)
 assert(run("POST","forget",key,"wrong")==403)

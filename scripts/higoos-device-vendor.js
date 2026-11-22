@@ -37,7 +37,10 @@ export function createDeviceVendor({defineComponent, h, ref}) {
   });
   database.then(value => { vendors.value = value; }).catch(() => {});
   return defineComponent({name:'HigoosDeviceVendor', props:{mac:String}, setup(props) {
-    return () => { const vendor = vendors.value && findVendor(props.mac, vendors.value); return vendor ? h('p', {class:'break-all',style:{fontSize:'11px',lineHeight:'1.25',opacity:'0.78',maxWidth:'100%'}}, `厂商：${vendor}`) : null; };
+    return () => {
+      const vendor = vendors.value && findVendor(props.mac, vendors.value);
+      return h('p', {class:'break-all',style:{height:'14px',margin:'0',fontSize:'11px',lineHeight:'14px',opacity:'0.78',maxWidth:'100%',overflow:'hidden'},...(vendor ? {} : {'aria-hidden':'true'})}, vendor ? `厂商：${vendor}` : '\u00a0');
+    };
   }});
 }
 export function brandLogo(brand) {

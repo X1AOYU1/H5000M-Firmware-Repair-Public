@@ -69,6 +69,19 @@ const icons = ['computer','mobile','tablet','tv','iot','game','other'].map(devic
 assert.equal(new Set(icons).size,7,'each device category has its own topology silhouette');
 for (const icon of icons) assert.ok(decodeURIComponent(icon).includes('viewBox="0 0 24 24"'));
 assert.equal(reconcile([{...phone,connectionType:'wired',connectionDetail:{kind:'wired'}}],snapshot([]))[0].isOnline,true,'wireless collection never marks wired clients offline');
+const firstAssociation = {interfaces:[{iface:'phy0-ap0',band:'wifi-2.4g',clients:[{mac:'0a:11:22:33:44:55',signalDbm:-41}]}],complete:true};
+const savedFetch = globalThis.fetch, savedLocation = globalThis.location;
+globalThis.location = {hostname:'router.test',port:'80',protocol:'http:'};
+globalThis.fetch = async url => ({ok:true,redirected:false,headers:new Headers(),json:async()=>
+  String(url).endsWith('device_wireless') ? firstAssociation : {markers:{},token:'test'}});
+const early = await (await import('../scripts/higoos-device-live.js?synthetic-test')).withLiveDevices(async()=>[]);
+assert.equal(early.length,1,'complete hostapd association appears before DHCP inventory discovery');
+assert.equal(early[0].name,'新接入设备');
+assert.equal(early[0].macAddress,'0A:11:22:33:44:55');
+assert.equal(early[0].connectionType,'wifi-2.4g');
+assert.equal(early[0].connectionDetail.signalDbm,-41);
+globalThis.fetch = savedFetch;
+if (savedLocation === undefined) delete globalThis.location; else globalThis.location = savedLocation;
 const store = new Map();
 const storage = {getItem:k=>store.get(k), setItem:(k,v)=>store.set(k,v)};
 const roam = createDeviceReconciler(storage);

@@ -138,7 +138,33 @@ async function wirelessSnapshot() {
 
 export async function withLiveDevices(load) {
   const [devices, snapshot] = await Promise.all([load(), wirelessSnapshot(), prepareDeviceHistory()]);
-  return Array.isArray(devices) ? filterDeviceHistory(reconcile(devices, snapshot), device => associatedDevices.has(device)) : devices;
+  if (!Array.isArray(devices)) return devices;
+  const current = reconcile(devices, snapshot);
+  // hostapd sees a station before DHCP/device inventory finishes discovering
+  // it. Surface that confirmed association immediately, then let the native
+  // device record replace this temporary MAC-only row on a later poll.
+  if (snapshot?.complete === true) {
+    const known = new Set(current.flatMap(device => [
+      macKey(device.macAddress), macKey(device.connectionDetail?.linkMac),
+    ]).filter(Boolean));
+    for (const row of snapshot.interfaces) for (const client of Object.values(row.clients)) {
+      const key = macKey(client.mac);
+      if (!key || known.has(key)) continue;
+      const band = bands.has(row.band) ? row.band : 'wifi-2.4g';
+      const kind = ({'wifi-2.4g':'wifi-2g','wifi-5g':'wifi-5g','wifi-6g':'wifi-6g'})[band];
+      current.push(inferDeviceType({
+        id: key.toUpperCase(), name: '新接入设备', macAddress: key.toUpperCase(), ipAddress: '',
+        connectionType: band, deviceType: 'other', osType: 'unknown', connectedTime: 0,
+        trafficAvailable: false, trafficRateAvailable: false, uploadSpeed: 0, downloadSpeed: 0,
+        isOnline: true, isGuest: false, isBlocked: false, isLimited: false,
+        hasParentalControl: false, trafficToday: 0, trafficWeek: 0, trafficMonth: 0,
+        connectionDetail: {kind, iface: row.iface, linkMac: key,
+          ...(Number.isFinite(client.signalDbm) && client.signalDbm < 0 ? {signalDbm: client.signalDbm} : {})},
+      }));
+      known.add(key);
+    }
+  }
+  return filterDeviceHistory(current, device => associatedDevices.has(device));
 }
 
 export async function withLiveDevice(load) {

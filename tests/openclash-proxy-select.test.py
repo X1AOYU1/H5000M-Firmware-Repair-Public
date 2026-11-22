@@ -15,8 +15,11 @@ with tempfile.TemporaryDirectory() as temporary:
     assets.mkdir(parents=True)
     page = assets / "OpenClashPage-fixture.js"
     page.write_text(
-        'const t={},j={},c={},w={},v={},$={select:async()=>({}),engine:async()=>({proxies:{}})},'
-        'G=async()=>{},N=async()=>{},H={value:{}},V={value:""};' + old,
+        'const t={value:!1},j={value:!1},c={value:!1},w={value:!1},v={value:{coreAvailable:!0}},'
+        '$={select:async()=>({}),engine:async()=>({proxies:{}})},G=async()=>{},N=async()=>{},'
+        'H={value:{group:{all:["node"],type:"Selector"}}},V={value:""},u={now:"node"},l="group";'
+        'const control={value:u.now,disabled:t.value,class:"rounded border border-line-1/70 bg-bg-2/50 p-2",'
+        'onChange:I=>Ge(l,I.target.value)};' + old,
         encoding="utf-8",
     )
     subprocess.run([sys.executable, str(patcher), str(root)], check=True)
@@ -35,6 +38,8 @@ with tempfile.TemporaryDirectory() as temporary:
     )
     if not all(value in first for value in required):
         raise SystemExit("ERROR: bounded proxy-selection recovery is incomplete")
+    if 'group.type==="Selector"?2:1' not in first or 'target.value=u.now??""' not in first:
+        raise SystemExit("ERROR: manual selection retry or failed-selection rollback is missing")
     node = shutil.which("node")
     if node:
         check = subprocess.run([node, "--check", str(page)], capture_output=True, text=True)

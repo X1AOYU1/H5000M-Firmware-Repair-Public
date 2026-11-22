@@ -12,10 +12,21 @@ s = p.read_text(encoding='utf-8')
 old = 'O.value.encryption=se(P.encryption)'
 new = 'O.value.encryption=h5000mUplinkSecurity(P.encryption),O.value.password=""'
 anchor = 'n.value?(a(),N(e(oe),{key:2,modelValue:t.draft.password'
-replacement = 'c(e(Ve),{modelValue:t.draft.encryption,"onUpdate:modelValue":v=>t.draft.encryption=v,options:[{value:"psk2",label:"WPA2"},{value:"sae-mixed",label:"WPA2/WPA3"},{value:"sae",label:"WPA3"},{value:"psk-mixed",label:"WPA/WPA2"},{value:"psk",label:"WPA"},{value:"wep-open",label:"WEP"},{value:"owe",label:"OWE"},{value:"none",label:"无密码"}],label:"热点加密方式（请核对）"},null,8,["modelValue"]),' + anchor
-if s.count(old) != 1 or s.count(anchor) != 1:
+replacement = 's("div",{class:"rounded-lg border border-line-1 bg-bg-1/50 px-3 py-2 text-sm text-txt-2"},"加密方式："+h5000mUplinkSecurityLabel(t.draft.encryption)),' + anchor
+save_old = 'const P=O.value.mode,K=ae.value?.uplink;for(const _ of["2.4g","5g"])'
+save_new = ('const P=O.value.mode,K=ae.value?.uplink;'
+            'if(P!=="off"&&!h5000mUplinkSecurity(O.value.encryption))throw new Error("无法识别热点加密方式，请重新扫描后再试");'
+            'if(P!=="off"&&we(O.value.encryption)&&!O.value.password)throw new Error("请填写热点密码后再保存");'
+            'for(const _ of["2.4g","5g"])')
+disable_old = 'config:{enabled:!1},apply:!0'
+disable_new = ('config:{band:_,enabled:!1,ssid:(K.ssid??O.value.ssid??"").trim(),'
+               'encryption:K.encryption??se(O.value.encryption),'
+               'password:K.password??(we(O.value.encryption)?O.value.password:""),'
+               'hidden:K.hidden??!1,bssid:(K.bssid??O.value.bssid??"").trim()},'
+               'apply:P==="off"')
+if s.count(old) != 1 or s.count(anchor) != 1 or s.count(disable_old) != 1 or s.count(save_old) != 1:
     raise SystemExit('Wireless page anchors changed; refusing partial patch')
-s = 'import{uplinkSecurity as h5000mUplinkSecurity}from"./higoos-uplink-security.js";' + s.replace(old, new, 1).replace(anchor, replacement, 1)
+s = 'import{uplinkSecurity as h5000mUplinkSecurity,uplinkSecurityLabel as h5000mUplinkSecurityLabel}from"./higoos-uplink-security.js";' + s.replace(old, new, 1).replace(anchor, replacement, 1).replace(disable_old, disable_new, 1).replace(save_old, save_new, 1)
 p.write_text(s, encoding='utf-8')
 (assets / 'higoos-uplink-security.js').write_text((Path(__file__).parent / 'higoos-uplink-security.js').read_text(encoding='utf-8'), encoding='utf-8')
-print('Patched wireless station scan security and selector')
+print('Patched automatic uplink security detection, validation, and complete uplink-disable payload')

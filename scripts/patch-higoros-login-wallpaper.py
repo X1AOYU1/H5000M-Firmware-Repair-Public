@@ -78,16 +78,16 @@ login_probe = (
     'box-shadow:0 12px 40px #0f172a35!important}\';'
     'styleTag.textContent+=\' .h5000m-wallpaper-active .text-txt-1,'+
     '.h5000m-wallpaper-active .text-txt-2,.h5000m-wallpaper-active .text-txt-4{color:#fff!important;'+
-    'text-shadow:0 1px 2px #000b}'+
+    'text-shadow:none!important}'+
     '.h5000m-wallpaper-active .login-input{background:transparent!important;'+
-    'color:#fff!important;border-color:rgba(255,255,255,.55)!important;text-shadow:0 1px 3px #000,0 0 5px #000!important}'+
+    'color:#fff!important;border-color:rgba(255,255,255,.55)!important;text-shadow:none!important}'+
     'html[data-theme="light"] .h5000m-wallpaper-active .login-input{background:transparent!important;'+
-    'text-shadow:0 1px 3px #000,0 0 5px #000!important}'+
+    'text-shadow:none!important}'+
     '.h5000m-wallpaper-active .login-input::placeholder{color:#d1d5db!important;opacity:1}'+
     '.h5000m-wallpaper-active .login-input:focus{outline:2px solid #fff!important;outline-offset:2px}'+
     '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-1,'+
     '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-2,'+
-    '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-4{color:#172033!important;text-shadow:0 1px 2px #fff!important}'+
+    '.h5000m-wallpaper-active.h5000m-wallpaper-light .text-txt-4{color:#172033!important;text-shadow:none!important}'+
     '.h5000m-wallpaper-active.h5000m-wallpaper-light .login-input{background:rgba(255,255,255,.78)!important;'
     'color:#111827!important;border-color:rgba(15,23,42,.55)!important;text-shadow:none!important}'+
     '.h5000m-wallpaper-active.h5000m-wallpaper-light .login-input::placeholder{color:#475569!important;opacity:1}'+
@@ -144,6 +144,22 @@ login_path.write_text(login, encoding="utf-8")
 
 native_path = native_pages[0]
 native = native_path.read_text(encoding="utf-8")
+# ArgonWallpaperEditor uses HigoOS's custom Select component, so its updates
+# do not bubble a native HTMLSelectElement change event. Clear the old local
+# upload override at the model-update boundary when a remote provider/default
+# is selected; otherwise the SPA login page keeps showing the uploaded image.
+source_select_anchor = 'function S(g){const r=String(g);o("update",r+(["unsplash","wallhaven"].includes(r)&&u.value?`_${u.value}`:""))}'
+source_select_replacement = (
+    'function S(g){const r=String(g);if(!r||["bing","ghser","unsplash","wallhaven"].includes(r))'
+    '{try{localStorage.removeItem("higoos_argon_login_wallpaper");'
+    'localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
+    'document.dispatchEvent(new Event("higoos-wallpaper-source-changed"))}'
+    'o("update",r+(["unsplash","wallhaven"].includes(r)&&u.value?`_${u.value}`:""))}'
+)
+if native.count(source_select_anchor) == 1:
+    native = native.replace(source_select_anchor, source_select_replacement, 1)
+elif source_select_replacement not in native:
+    raise SystemExit("ERROR: Argon wallpaper source selector update anchor changed")
 crop_module = assets / "higoos-wallpaper-crop.js"
 crop_source = Path(__file__).with_name("higoos-wallpaper-crop.js").read_text(encoding="utf-8")
 crop_import = 'import{mountHigoosWallpaperCrop}from"./higoos-wallpaper-crop.js";'

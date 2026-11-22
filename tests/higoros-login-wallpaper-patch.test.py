@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'const{query:s,upload:l,remove:o}=Fe(),v=V(null),u=V(null),i=V(""),y=V(!1),S=V(null),N=V(!1),'
         'g=D(()=>l.isPending.value||o.isPending.value);async function r(){try{await l.mutateAsync('
         '{file:u.value,revision:c?.revision||s.data.value.newRevision}),u.value=null,y.value=!1,v.value&&(v.value.value="")}'
-        'catch(d){i.value="failed"}}async function C(){const c=S.value;if(c){try{await o.mutateAsync('
+        'catch(d){i.value="failed"}}function S(g){const r=String(g);o("update",r+(["unsplash","wallhaven"].includes(r)&&u.value?`_${u.value}`:""))}async function C(){const c=S.value;if(c){try{await o.mutateAsync('
         '{name:c.name,revision:c.revision}),S.value=null,N.value=!1}catch(d){i.value="failed"}}}'
         'Z(t(s).data.value.files,b=>(f(),x("tr"',
         encoding="utf-8",
@@ -56,6 +56,7 @@ with tempfile.TemporaryDirectory() as temporary:
         'background:rgba(255,255,255,.86)!important;backdrop-filter:blur(14px)!important',
         'h5000m-wallpaper-light .login-input{background:rgba(255,255,255,.78)!important',
         'h5000m-wallpaper-light .text-txt-1',
+        'text-shadow:none!important',
         'html[data-theme="light"] .router-card.login-card.h5000m-wallpaper-transparent',
         'html[data-theme="dark"] .router-card.login-card.h5000m-wallpaper-transparent',
         'if(!wallpaper.value){activeCard?.classList.remove("h5000m-wallpaper-transparent")',
@@ -78,8 +79,10 @@ with tempfile.TemporaryDirectory() as temporary:
         raise SystemExit(f"ERROR: login page wallpaper integration is missing {missing_login!r}")
     if any(marker not in native_source for marker in required_native):
         raise SystemExit("ERROR: Argon file upload/list does not publish a stable login wallpaper")
-    if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 1:
+    if native_source.count('localStorage.removeItem("higoos_argon_login_wallpaper_source")') != 2:
         raise SystemExit("ERROR: repeated patching duplicated or skipped the upload cache reset")
+    if 'function S(g){const r=String(g);if(!r||["bing","ghser","unsplash","wallhaven"].includes(r))' not in native_source:
+        raise SystemExit("ERROR: choosing a remote wallpaper provider does not clear the upload override")
     if not (assets / "higoos-wallpaper-crop.js").is_file():
         raise SystemExit("ERROR: patch did not copy the standalone crop module into web assets")
     if 'import"./higoos-wallpaper-source.js";' not in entry.read_text(encoding="utf-8"):

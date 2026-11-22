@@ -15,8 +15,10 @@ function endpoints() {
 }
 async function request(options) {
   let lastError;
+  let failedEndpoint = '';
   for (const endpoint of endpoints()) {
     try {
+      failedEndpoint = endpoint;
       const crossPort = endpoint !== endpointPath;
       const response = await fetch(endpoint, {credentials:crossPort?'include':'same-origin',cache:'no-store',signal:AbortSignal.timeout(2000),...options});
       const data = await response.json().catch(()=>null);
@@ -25,6 +27,8 @@ async function request(options) {
       return data;
     } catch (error) { lastError = error; }
   }
+  if (lastError instanceof TypeError && /fetch/i.test(lastError.message || ''))
+    throw new Error(`无法连接离线记录服务（${failedEndpoint}）。请通过路由器管理地址访问，并确认 LuCI 服务正常运行。`);
   throw new Error(lastError?.message || '清理服务暂不可用，请重新登录后重试');
 }
 async function load(force=false) {
