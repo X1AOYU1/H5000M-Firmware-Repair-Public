@@ -49,11 +49,11 @@ def patch(root):
     if outer_card_flex not in body:
         body = replace(body, outer_card, outer_card_flex)
     inner_card = 'Vs={class:"relative z-10"}'
-    inner_card_flex = 'Vs={class:"relative z-10",style:{display:"flex",flex:"1 1 auto",flexDirection:"column",paddingBottom:"2rem"}}'
+    inner_card_flex = 'Vs={class:"relative z-10",style:{position:"relative",zIndex:10,display:"flex",flex:"1 1 auto",flexDirection:"column",paddingBottom:"2rem"}}'
     if inner_card_flex not in body:
         body = replace(body, inner_card, inner_card_flex)
     controls = ('e("div",{class:"flex min-w-0 items-center justify-between gap-2 overflow-hidden",'
-                'style:{position:"absolute",left:"0",right:"0",bottom:"0",height:"28px",minHeight:"28px",maxHeight:"28px",boxSizing:"border-box"}},[' + card + ',' + history + '])')
+                'style:{position:"absolute",zIndex:20,left:"0",right:"0",bottom:"0",height:"28px",minHeight:"28px",maxHeight:"28px",boxSizing:"border-box"}},[' + card + ',' + history + '])')
     if controls not in body:
         siblings = card + ',' + history
         if siblings in body:
