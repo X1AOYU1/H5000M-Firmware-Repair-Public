@@ -85,7 +85,7 @@ try {
   assert.ok(Date.now()-since<6500,'offline state must not wait for the stale 30-second backend status');
   assert.ok(!(await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'),'offline card clears negotiated rate too');
   await page.getByText('离线',{exact:true}).first().waitFor({timeout:3000});
-  await page.getByRole('button',{name:'清理离线记录',exact:true}).click();
+  await page.locator('.glass-effect').filter({has:page.getByText(phone.name,{exact:true})}).getByRole('button',{name:'清理离线记录',exact:true}).click();
   await page.getByRole('button',{name:'确认清理',exact:true}).click();
   await page.getByText(phone.name,{exact:true}).waitFor({state:'hidden',timeout:3500});
   assert.equal(Object.keys(markers).length,1,'clearing persists a router-side marker');
