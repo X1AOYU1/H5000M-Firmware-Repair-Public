@@ -56,6 +56,8 @@ jobs:
         run: node tests/higoos-device-vendor.test.mjs
       - name: Test wireless presence and topology reconciliation
         run: node tests/higoos-device-live.test.mjs
+      - name: Test shared live speed sampling
+        run: node tests/higoos-realtime-speed.test.mjs
       - name: Test OpenClash node cleanup
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
@@ -134,6 +136,8 @@ jobs:
         run: sudo python3 tests/higoos-device-remarks.test.py output/final-root
       - name: Test authenticated wireless snapshots through LuCI
         run: sudo python3 tests/higoos-device-wireless.test.py output/final-root
+      - name: Test authenticated offline device cleanup through LuCI
+        run: sudo python3 tests/higoos-device-history.test.py output/final-root
       - name: Dynamically click OpenClash app-center entry
         id: openclash_browser_audit
         env:

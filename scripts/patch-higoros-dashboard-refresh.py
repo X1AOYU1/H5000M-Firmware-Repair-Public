@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import re
 import sys
 
 root = Path(sys.argv[1])
@@ -16,6 +17,8 @@ ui_new = 't("div",vo,[t("label",{class:"flex items-center gap-2 text-sm text-txt
 if body.count(anchor) != 1 or body.count(ui) != 1:
     raise SystemExit('ERROR: dashboard refresh anchors changed')
 body = body.replace(anchor, replacement, 1).replace(ui, ui_new, 1)
+body = body.replace('h5000mSchedule();h5000mTick()};const h5000mVisible',
+                    'window.dispatchEvent(new Event("higoos-refresh-change"));h5000mSchedule();h5000mTick()};const h5000mVisible', 1)
 # The dashboard owns one clock. A slow optional query must not block the
 # traffic/device queries, nor may it be cancelled and restarted every tick.
 edits = [
@@ -24,6 +27,10 @@ edits = [
      's=lt(!1),e=ut({refetchInterval:!1}),n=pt(),i=dt("",{refetchInterval:!1})'),
     ('await Promise.allSettled(ie.map(g=>g.refetch()))',
      'await Promise.allSettled(ie.filter(g=>!g.isFetching.value&&(g!==C||L.value)).map(g=>g.refetch({cancelRefetch:!1})))'),
+    ('ta=()=>{const a=M(Pt)',
+     'ta=()=>{const h5000mSpeed=M(null);const h5000mUnsubscribe=subscribeRealtimeSpeed(value=>{h5000mSpeed.value=value});Te(h5000mUnsubscribe);const a=M(Pt)'),
+    ('Rt(s.data.value??[],u.data.value??null,d.data.value??null)',
+     'Rt(s.data.value??[],{...u.data.value,upload:h5000mSpeed.value?.upload??0,download:h5000mSpeed.value?.download??0},d.data.value??null)'),
 ]
 for old, new in edits:
     if body.count(old) != 1:
@@ -43,5 +50,29 @@ if wifi.count(start) != 1 or wifi.count(end) != 1:
 wifi = wifi.replace(start, 'Ie=(h5000mOptions={})=>p({queryKey:o.settings()', 1)
 wifi = wifi.replace(end, '?!1:te},...h5000mOptions}),Me=', 1)
 wireless[0].write_text(wifi, encoding='utf-8')
-page.write_text(body, encoding='utf-8')
+page.write_text('import{subscribeRealtimeSpeed}from"./higoos-realtime-speed.js";' + body, encoding='utf-8')
+
+# The shell stays mounted while navigating pages. Subscribe to the same sample
+# as the dashboard, removing its independent polling and stale-history fallback.
+entries = list(assets.glob('index-*.js'))
+entries = [p for p in entries if 'function fd(e=15e3,t=5e3)' in p.read_text(encoding='utf-8')]
+if len(entries) != 1:
+    raise SystemExit('ERROR: expected one sidebar speed owner')
+entry = entries[0]
+shell = entry.read_text(encoding='utf-8')
+shell, count = re.subn(r'k=async\(\)=>\{try\{const h=await ve.getRealtimeSpeed\(\);.*?\},v=async\(\)=>',
+    'h5000mUnsubscribe=subscribeRealtimeSpeed(value=>{o.value=value??{upload:0,download:0}}),v=async()=>', shell)
+if count != 1:
+    raise SystemExit('ERROR: sidebar speed callback anchor changed')
+for old, new in [
+    ('E(),k(),v(),n=window.setInterval(()=>{An()&&E()},e),s=window.setInterval(()=>{An()&&k()},t)',
+     'E(),v(),n=window.setInterval(()=>{An()&&E()},e)'),
+    ('s!==null&&(window.clearInterval(s),s=null)}),{egressInfo:r',
+     'h5000mUnsubscribe()}),{egressInfo:r'),
+]:
+    if shell.count(old) != 1:
+        raise SystemExit('ERROR: sidebar lifecycle anchor changed: ' + old)
+    shell = shell.replace(old, new, 1)
+entry.write_text('import{subscribeRealtimeSpeed}from"./higoos-realtime-speed.js";' + shell, encoding='utf-8')
+(assets / 'higoos-realtime-speed.js').write_bytes((Path(__file__).parent / 'higoos-realtime-speed.js').read_bytes())
 print('Dashboard refresh control installed')

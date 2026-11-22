@@ -12,6 +12,8 @@ const {chromium} = require('playwright');
 const resources = '/api/v1/system/resources', devices = '/api/v1/devices';
 const requests = [], errors = [];
 let resourceCycle = 0, deviceCycle = 0, rankingActive = 0, rankingMax = 0;
+let speedCycle=0, speedActive=0, speedMax=0;
+const speed='/api/v1/system/realtime-speed';
 const assets = await readdir(join(root, 'assets'));
 const entry = assets.find(x => x.startsWith('index-DhOCiPK2'));
 const server = createServer(async (req, res) => {
@@ -23,7 +25,12 @@ const server = createServer(async (req, res) => {
     if (url.pathname !== resources || overviewResource)
       requests.push({path:url.pathname, at:Date.now()});
     let data = {};
-    if (url.pathname === '/api/v1/auth/me') data = {username:'audit',role:'admin',permissions:['*']};
+    if (url.pathname === speed) {
+      speedMax=Math.max(speedMax,++speedActive);
+      await new Promise(r=>setTimeout(r,80));
+      data={upload:++speedCycle+200,download:speedCycle+300};speedActive--;
+    }
+    else if (url.pathname === '/api/v1/auth/me') data = {username:'audit',role:'admin',permissions:['*']};
     else if (url.pathname === resources) {
       if (overviewResource) resourceCycle++;
       data = {download:resourceCycle + 10,upload:resourceCycle,activeConnections:resourceCycle + 100,
@@ -69,18 +76,22 @@ try {
     await page.waitForTimeout(350);
     const since = Date.now(), before = resourceCycle;
     await page.waitForTimeout(seconds*2000+450);
-    for (const path of [resources,devices]) {
+    for (const path of [resources,devices,speed]) {
       const ticks = requests.filter(r=>r.path===path&&r.at>=since);
       assert.equal(ticks.length,2, `${seconds}s: exactly two ${path} updates, got ${JSON.stringify(ticks)}`);
       const gap = ticks[1].at-ticks[0].at;
       assert.ok(Math.abs(gap-seconds*1000)<450, `${path}: incorrect ${seconds}s interval: ${gap}`);
     }
     assert.equal(resourceCycle,before+2);
+    const cards=await page.locator('.metric-card').allInnerTexts();
+    assert.ok(cards.some(text=>text.includes(String(speedCycle+300))), 'download card uses live speed instead of resource history');
+    assert.ok(cards.some(text=>text.includes(String(speedCycle+200))), 'upload card uses the same live sample');
     assert.ok((await page.locator('body').innerText()).includes('设备刷新-'+deviceCycle), 'new device response reaches the rendered UI');
     assert.ok((await page.locator('body').innerText()).includes(String(resourceCycle+100)), 'new connection count reaches the rendered UI');
     console.log(`PASS: ${seconds}s selector controls resource and device HTTP requests and rendered values`);
   }
   assert.equal(rankingMax,1,'slow ranking requests must never overlap');
+  assert.equal(speedMax,1,'sidebar and dashboard share one sampler');
   await page.reload();
   await select.waitFor();
   assert.equal(await select.inputValue(),'5','interval survives reload');

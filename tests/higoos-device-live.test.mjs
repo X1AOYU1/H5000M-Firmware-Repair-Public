@@ -43,6 +43,14 @@ const observedPhone = {name:'Yu-de-S24-Ultra',macAddress:'0A:F1:B0:C0:40:19',ipA
 const observedSnapshot = clients => ({complete:true,interfaces:[
   {iface:'phy0-ap0',band:'wifi-2.4g',clients}, {iface:'phy1-ap0',band:'wifi-5g',clients:[]}]});
 const realCase = createDeviceReconciler(null,null);
+const linkStore = new Map();
+const linkStorage = {getItem:k=>linkStore.get(k),setItem:(k,v)=>linkStore.set(k,v)};
+createDeviceReconciler(linkStorage)([observedPhone],observedSnapshot([{mac:'0a:f1:b0:c0:40:9a'}]));
+const lostLink = {...observedPhone,connectionType:'unknown',connectionDetail:undefined};
+const learned = createDeviceReconciler(linkStorage)([lostLink],observedSnapshot([{mac:'0a:f1:b0:c0:40:9a'}]))[0];
+assert.equal(learned.isOnline,true,'reload restores confirmed link MAC when backend drops details');
+assert.equal(learned.connectionDetail.kind,'wifi-2g');
+assert.equal(learned.connectionDetail.linkMac,'0a:f1:b0:c0:40:9a');
 const absentPhone = realCase([observedPhone],observedSnapshot([]))[0];
 assert.equal(absentPhone.connectionDetail.signalDbm,undefined,'offline backend data must not display stale signal');
 assert.equal(absentPhone.connectionDetail.rxRateMbps,undefined,'offline backend data must not display stale rate');

@@ -1,4 +1,7 @@
 import { inferDeviceType } from './higoos-device-type.js';
+import { filterDeviceHistory, prepareDeviceHistory } from './higoos-device-history.js';
+
+const associatedDevices = new WeakSet();
 
 const endpoint = '/cgi-bin/luci/admin/services/openclash/device_wireless';
 const bands = new Set(['wifi-2.4g', 'wifi-5g', 'wifi-6g']);
@@ -41,7 +44,7 @@ export function createDeviceReconciler(storage, identityStorage) {
   }
   function remember(key, state) {
     if (!key) return;
-    remembered[key] = {seen: Date.now(), band: state.band};
+    remembered[key] = {seen: Date.now(), band: state.band, linkMac: state.linkMac, iface: state.iface};
     const entries = Object.entries(remembered);
     if (entries.length > 512) {
       entries.sort((a, b) => b[1].seen - a[1].seen);
@@ -61,7 +64,8 @@ export function createDeviceReconciler(storage, identityStorage) {
       const detail = {...device.connectionDetail};
       const key = macKey(device.macAddress);
       const state = history.get(key) || {missing: 0};
-      const hit = associated.get(key) || associated.get(macKey(detail.linkMac));
+      const linkMac = macKey(detail.linkMac || state.linkMac || remembered[key]?.linkMac);
+      const hit = associated.get(key) || associated.get(linkMac);
       const prior = identities[key];
       if (prior && !usefulName(device.name, device.ipAddress)) {
         device = inferDeviceType({...device, name: prior.name,
@@ -80,13 +84,17 @@ export function createDeviceReconciler(storage, identityStorage) {
         // A stale offline backend record can retain the previous session's
         // rates. Show only measurements from the current association until
         // the backend reports the device online again.
-        if (!original.isOnline) for (const field of liveFields) delete detail[field];
+        if (!original.isOnline || (detail.iface && detail.iface !== hit.row.iface))
+          for (const field of liveFields) delete detail[field];
         state.missing = 0;
         if (bands.has(hit.row.band)) state.band = hit.row.band;
         state.iface = hit.row.iface;
+        state.linkMac = macKey(hit.client.mac);
         remember(key, state);
         if (usefulName(original.name, original.ipAddress)) saveIdentity(key, device, detail);
         detail.iface = hit.row.iface;
+        detail.linkMac = state.linkMac;
+        detail.kind = ({'wifi-2.4g':'wifi-2g','wifi-5g':'wifi-5g','wifi-6g':'wifi-6g'})[state.band] || detail.kind;
         if (Number.isFinite(hit.client.signalDbm) && hit.client.signalDbm < 0) detail.signalDbm = hit.client.signalDbm;
         device = {...device, isOnline: true, connectionType: state.band || 'wifi'};
       } else if (wireless) {
@@ -104,8 +112,11 @@ export function createDeviceReconciler(storage, identityStorage) {
       if (!device.isOnline) {
         for (const field of liveFields) delete detail[field];
         device = {...device, downloadSpeed: 0, uploadSpeed: 0, trafficRateAvailable: false};
+        device.connectedTime = 0;
       }
-      return {...device, connectionDetail: detail};
+      const result = {...device, connectionDetail: detail};
+      if (hit) associatedDevices.add(result);
+      return result;
     });
   };
 }
@@ -126,8 +137,8 @@ async function wirelessSnapshot() {
 }
 
 export async function withLiveDevices(load) {
-  const [devices, snapshot] = await Promise.all([load(), wirelessSnapshot()]);
-  return Array.isArray(devices) ? reconcile(devices, snapshot) : devices;
+  const [devices, snapshot] = await Promise.all([load(), wirelessSnapshot(), prepareDeviceHistory()]);
+  return Array.isArray(devices) ? filterDeviceHistory(reconcile(devices, snapshot), device => associatedDevices.has(device)) : devices;
 }
 
 export async function withLiveDevice(load) {
