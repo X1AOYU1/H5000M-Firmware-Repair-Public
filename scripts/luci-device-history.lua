@@ -6,6 +6,16 @@ function action_higoros_device_history()
 		HTTP.status(code)
 		HTTP.prepare_content("application/json")
 		HTTP.header("Cache-Control", "no-store")
+		-- HigoOS serves its SPA on :80 while LuCI may be on :8080. Permit
+		-- credentialed requests only when both origins use the same host.
+		local origin = HTTP.getenv("HTTP_ORIGIN") or ""
+		local origin_host = origin:match("^https?://([^/:]+)")
+		local request_host = (HTTP.getenv("HTTP_HOST") or ""):match("^([^:]+)")
+		if origin_host and request_host and origin_host == request_host then
+			HTTP.header("Access-Control-Allow-Origin", origin)
+			HTTP.header("Access-Control-Allow-Credentials", "true")
+			HTTP.header("Vary", "Origin")
+		end
 		return HTTP.write_json(payload)
 	end
 	if context.authuser ~= "root" or not context.authsession or not context.authtoken then

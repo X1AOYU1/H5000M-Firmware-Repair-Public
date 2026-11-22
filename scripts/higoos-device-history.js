@@ -1,14 +1,31 @@
-const endpoint = '/cgi-bin/luci/admin/services/openclash/device_history';
+const endpointPath = '/cgi-bin/luci/admin/services/openclash/device_history';
 const keyOf = mac => /^[\da-f]{2}(?::[\da-f]{2}){5}$/i.test(mac || '') ? mac.replaceAll(':', '').toLowerCase() : '';
 let markers = {}, token, pending, loadedAt = 0;
 const restoring = new Map();
 const offlineGenerations = new Map();
+function endpoints() {
+  const list = [endpointPath];
+  // HigoOS serves the SPA on :80 while LuCI/uhttpd commonly listens on :8080.
+  // Keep the relative URL first for devices that proxy LuCI on the same origin.
+  if (typeof location !== 'undefined' && location.hostname) {
+    const port = location.port || (location.protocol === 'https:' ? '443' : '80');
+    if (port !== '8080') list.push(`${location.protocol}//${location.hostname}:8080${endpointPath}`);
+  }
+  return list;
+}
 async function request(options) {
-  const response = await fetch(endpoint, {credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(2000),...options});
-  const data = await response.json().catch(()=>null);
-  if (!response.ok || response.redirected || response.headers.has('x-luci-login-required') || !data)
-    throw new Error(data?.error || '清理服务暂不可用，请重新登录后重试');
-  return data;
+  let lastError;
+  for (const endpoint of endpoints()) {
+    try {
+      const crossPort = endpoint !== endpointPath;
+      const response = await fetch(endpoint, {credentials:crossPort?'include':'same-origin',cache:'no-store',signal:AbortSignal.timeout(2000),...options});
+      const data = await response.json().catch(()=>null);
+      if (!response.ok || response.redirected || response.headers.has('x-luci-login-required') || !data)
+        throw new Error(data?.error || `清理服务返回 HTTP ${response.status}`);
+      return data;
+    } catch (error) { lastError = error; }
+  }
+  throw new Error(lastError?.message || '清理服务暂不可用，请重新登录后重试');
 }
 async function load(force=false) {
   if (pending) return pending;

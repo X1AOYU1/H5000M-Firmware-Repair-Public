@@ -54,6 +54,24 @@ def patch(root):
                    'o=i.node.type==="device"?topologyDeviceIcon(i.node,l.iconColor):qs(i.node.type,l.iconColor)')
     body = replace(body, 'name:`${N.name} (${N.devices.length})`,type:N.type,children:N.devices.map(Ce)',
         'name:`${N.devices.some(U=>U.isOnline)?N.name:"离线设备"} (${N.devices.length})`,type:N.type,status:N.devices.some(U=>U.isOnline)?"online":"offline",children:N.devices.map(Ce)')
+    # A wireless band node represents the enabled AP/radio, not the presence
+    # of a client. A remembered offline client must not turn an active 2.4/5/6G
+    # radio red/offline in the topology. Keep the offline status for the
+    # explicit unknown-connection history group above.
+    wireless_groups_patched = 0
+    for old, new in (
+        ('name:`WiFi 2.4G (${g.length})`,type:"wireless",status:g.some(N=>N.isOnline)?"online":"offline"',
+         'name:`WiFi 2.4G (${g.length})`,type:"wireless",status:"online"'),
+        ('name:`WiFi 5G (${C.length})`,type:"wireless",status:C.some(N=>N.isOnline)?"online":"offline"',
+         'name:`WiFi 5G (${C.length})`,type:"wireless",status:"online"'),
+        ('name:`WiFi 6G (${v.length})`,type:"wireless",status:v.some(N=>N.isOnline)?"online":"offline"',
+         'name:`WiFi 6G (${v.length})`,type:"wireless",status:"online"'),
+    ):
+        if old in body:
+            body = body.replace(old, new, 1)
+            wireless_groups_patched += 1
+    if wireless_groups_patched != 3:
+        raise SystemExit(f"ERROR: expected all wireless topology groups, patched {wireless_groups_patched}/3")
     if 'import{topologyDeviceIcon}' not in body:
         body = 'import{topologyDeviceIcon}from"./higoos-topology-icons.js";' + body
     network.write_text(body, encoding="utf-8")
