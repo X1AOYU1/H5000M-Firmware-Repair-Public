@@ -79,7 +79,7 @@ try {
   assert.ok(Date.now()-discoveredAt<3500, 'UI renders promptly after backend discovery');
   await page.getByText('-45 dBm(极好)',{exact:true}).waitFor();
   assert.ok((await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'));
-  const controlRows = page.locator('.glass-effect .h-7');
+  const controlRows = page.locator('.glass-effect [style*="height: 28px"]');
   assert.equal(await controlRows.count(), 2, 'each device reserves the same controls row');
   const rowMetrics = await controlRows.evaluateAll(rows => rows.map(row => ({bottom:Math.round(row.getBoundingClientRect().bottom),height:Math.round(row.getBoundingClientRect().height)})));
   assert.equal(rowMetrics[0].bottom, rowMetrics[1].bottom, 'remark and offline cleanup rows align at the card bottom');

@@ -75,7 +75,7 @@ export function createDeviceHistory({defineComponent,h,ref,Modal,Button}) {
       } catch(cause) {error.value=cause.message;} finally {busy.value=false;}
     }
     return ()=>!props.device.isOnline && keyOf(props.device.macAddress) ? h('div',{class:'flex h-full shrink-0 items-center'},[
-      h('button',{type:'button',class:'shrink-0 whitespace-nowrap text-xs text-txt-3 hover:underline',onClick:()=>{show.value=true;error.value='';}},'清理离线记录'),
+      h('button',{type:'button',class:'shrink-0 text-xs text-txt-3 hover:underline',style:{whiteSpace:'nowrap'},onClick:()=>{show.value=true;error.value='';}},'清理离线记录'),
       show.value?h(Modal,{modelValue:true,'onUpdate:modelValue':v=>{if(!busy.value)show.value=v;},title:'清理离线记录',size:'sm'},{
         default:()=>[
           h('p',{class:'text-sm text-txt-2'},`将 ${props.device.name || props.device.macAddress} 从设备列表移除。重新接入后会重新显示，不影响接入或上网规则；历史流量统计保留。`),
