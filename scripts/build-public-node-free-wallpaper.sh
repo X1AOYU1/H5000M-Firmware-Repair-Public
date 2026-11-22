@@ -182,7 +182,7 @@ with tarfile.open(source, "r:*") as archive:
 PY
 cp "$OUT/repaired.tar" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
 cat > "$OUT/metadata.json" <<'JSON'
-{ "metadata_version": "1.1", "compat_version": "1.0", "supported_devices": ["hiveton,h5000m", "hiveton-h5000m"], "version": { "dist": "ImmortalWrt", "version": "24.10-SNAPSHOT", "revision": "unknown", "target": "mediatek/filogic", "board": "hiveton,h5000m" } }
+{ "metadata_version": "1.1", "compat_version": "1.0", "supported_devices": ["hiveton,h5000m", "hiveton-h5000m"], "version": { "dist": "ImmortalWrt", "version": "26.10 by X1AOYU", "revision": "unknown", "target": "mediatek/filogic", "board": "hiveton,h5000m" } }
 JSON
 fwtool -I "$OUT/metadata.json" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
 fwtool -i "$OUT/metadata-extracted.json" "$OUT/H5000M-6.6.160-full-repair-NO-NODES.bin"
@@ -192,6 +192,7 @@ import json
 import sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
 assert data["compat_version"] == "1.0" and "hiveton,h5000m" in data["supported_devices"]
+assert data["version"]["version"] == "26.10 by X1AOYU"
 assert data["version"]["target"] == "mediatek/filogic"
 print("PASS: H5000M upgrade metadata round-trip verified")
 PY
