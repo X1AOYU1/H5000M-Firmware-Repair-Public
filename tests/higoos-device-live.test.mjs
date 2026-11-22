@@ -63,4 +63,18 @@ assert.equal(reload([{...unknown,connectionType:'wired',connectionDetail:{kind:'
 const stranger = {...unknown,macAddress:'00:11:22:33:44:55'};
 reload([stranger],snapshot([]));
 assert.equal(reload([stranger],snapshot([]))[0].isOnline,true,'unknown device without wireless evidence is not guessed offline');
+const identityStore = new Map();
+const identityStorage = {getItem:k=>identityStore.get(k), setItem:(k,v)=>identityStore.set(k,v)};
+const rememberedPhone = createDeviceReconciler(storage, identityStorage);
+rememberedPhone([phone],snapshot([station]));
+const erased = {...unknown,name:'10.0.0.4',ipAddress:'10.0.0.4',deviceType:'other'};
+const restored = rememberedPhone([erased],snapshot([]))[0];
+assert.equal(restored.name, phone.name, 'retain previously observed hostname for exact MAC');
+assert.equal(restored.deviceType, 'mobile');
+assert.equal(restored.connectionDetail.ssid, 'home');
+const freshPage = createDeviceReconciler(storage,identityStorage);
+assert.equal(freshPage([erased],snapshot([]))[0].name,phone.name,'identity survives browser reload');
+assert.equal(freshPage([{...erased,macAddress:'0A:F1:B0:C0:40:19'}],snapshot([]))[0].name,'10.0.0.4','never transfer identity across MACs');
+assert.equal(freshPage([{...phone,name:'new-name'}],snapshot([station]))[0].name,'new-name','current hostname takes precedence');
+assert.equal(freshPage([erased],snapshot([]))[0].name,'new-name','updated hostname replaces old');
 console.log('PASS: association disconnect/reconnect/roam, MLO, failure fallback, offline metrics, type-aware topology icons');

@@ -7,9 +7,28 @@ const liveFields = ['signalDbm', 'rxRateMbps', 'txRateMbps', 'mcs', 'bandwidthMh
 
 // Shared by devices, details, dashboard and topology. Two complete absence
 // samples avoid one transient association-table omission causing flicker.
-export function createDeviceReconciler(storage) {
+export function createDeviceReconciler(storage, identityStorage) {
   if (storage === undefined) {
     try { storage = globalThis.sessionStorage; } catch { storage = null; }
+  }
+  if (identityStorage === undefined) {
+    try { identityStorage = globalThis.localStorage; } catch { identityStorage = null; }
+  }
+  const identityKey = 'higoos-device-identity-v1';
+  let identities = {};
+  try { identities = JSON.parse(identityStorage?.getItem(identityKey) || '{}') || {}; } catch {}
+  if (typeof identities !== 'object' || Array.isArray(identities)) identities = {};
+  const nowIdentity = Date.now();
+  for (const [key, entry] of Object.entries(identities)) {
+    if (!entry || !Number.isFinite(entry.seen) || nowIdentity - entry.seen > 30 * 86400000 || entry.seen > nowIdentity) delete identities[key];
+  }
+  const usefulName = (name, ip) => typeof name === 'string' && !!name.trim() && name !== ip && !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(name.trim());
+  function saveIdentity(key, device, detail) {
+    if (!key || !usefulName(device.name, device.ipAddress)) return;
+    identities[key] = {seen: Date.now(), name: device.name, type: device.deviceType, ssid: detail.ssid};
+    const entries = Object.entries(identities).sort((a,b)=>b[1].seen-a[1].seen).slice(0,512);
+    identities = Object.fromEntries(entries);
+    try { identityStorage?.setItem(identityKey, JSON.stringify(identities)); } catch {}
   }
   const history = new Map();
   const storageKey = 'higoos-associated-wifi-v1';
@@ -43,6 +62,12 @@ export function createDeviceReconciler(storage) {
       const key = macKey(device.macAddress);
       const state = history.get(key) || {missing: 0};
       const hit = associated.get(key) || associated.get(macKey(detail.linkMac));
+      const prior = identities[key];
+      if (prior && !usefulName(device.name, device.ipAddress)) {
+        device = inferDeviceType({...device, name: prior.name,
+          deviceType: device.deviceType && device.deviceType !== 'other' ? device.deviceType : prior.type});
+        if (!detail.ssid && typeof prior.ssid === 'string') detail.ssid = prior.ssid;
+      }
       const explicitlyWired = device.connectionType === 'wired' || detail.kind === 'wired';
       const wireless = !explicitlyWired && (device.connectionType?.startsWith('wifi') ||
         detail.kind?.startsWith('wifi') || detail.kind === 'wireless' || !!state.iface || !!remembered[key]);
@@ -56,6 +81,7 @@ export function createDeviceReconciler(storage) {
         if (bands.has(hit.row.band)) state.band = hit.row.band;
         state.iface = hit.row.iface;
         remember(key, state);
+        if (usefulName(original.name, original.ipAddress)) saveIdentity(key, device, detail);
         detail.iface = hit.row.iface;
         if (Number.isFinite(hit.client.signalDbm) && hit.client.signalDbm < 0) detail.signalDbm = hit.client.signalDbm;
         device = {...device, isOnline: true, connectionType: state.band || 'wifi'};
