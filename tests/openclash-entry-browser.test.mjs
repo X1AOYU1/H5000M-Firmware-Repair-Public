@@ -267,7 +267,13 @@ try {
   page = await browser.newPage();
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") pageErrors.push(message.text());
+    if (message.type() === "error") {
+      const location = message.location();
+      pageErrors.push(`${message.text()} [${location.url || "unknown"}]`);
+    }
+  });
+  page.on("requestfailed", (request) => {
+    pageErrors.push(`request failed: ${request.url()} (${request.failure()?.errorText ?? "unknown"})`);
   });
   await page.goto(baseUrl + "/login", { waitUntil: "domcontentloaded" });
   await page.locator('[autocomplete="username"]').fill("root");
