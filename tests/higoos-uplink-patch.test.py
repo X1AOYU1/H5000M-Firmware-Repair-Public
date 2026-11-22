@@ -27,9 +27,13 @@ with tempfile.TemporaryDirectory() as directory:
         raise SystemExit("ERROR: turning off an uplink does not submit the backend-required SSID and settings")
     if patched.count('config:{band:_,enabled:!1,ssid:') != 1:
         raise SystemExit("ERROR: the uplink disable payload patch is not applied exactly once")
-    if 'h5000mUplinkSecurityLabel(t.draft.encryption)' not in patched:
-        raise SystemExit("ERROR: uplink encryption is not shown as an automatically detected value")
-    if '无法识别热点加密方式，请重新扫描后再试' not in patched:
+    if '"onUpdate:modelValue":v=>t.draft.encryption=v' not in patched:
+        raise SystemExit("ERROR: uplink security manual override is missing")
+    if '热点加密方式（自动识别，可手动调整）' not in patched:
+        raise SystemExit("ERROR: automatic detection and manual override are not explained")
+    if '{value:"sae-mixed",label:"WPA2/WPA3"}' not in patched or '{value:"psk2",label:"WPA2"}' not in patched:
+        raise SystemExit("ERROR: common WPA2 and WPA3 security modes cannot be selected manually")
+    if '无法识别热点加密方式，请手动选择或重新扫描' not in patched:
         raise SystemExit("ERROR: unknown scan encryption would still be submitted")
     if '请填写热点密码后再保存' not in patched:
         raise SystemExit("ERROR: secured uplink can be submitted without a password")
@@ -37,8 +41,6 @@ with tempfile.TemporaryDirectory() as directory:
         raise SystemExit("ERROR: changing uplink bands does not stage the old-band disable")
     if 'hidden:K.hidden??!1,bssid:(K.bssid??O.value.bssid??"").trim()},apply:P==="off"' not in patched:
         raise SystemExit("ERROR: the old uplink must apply immediately only when turning relay off")
-    if 'onUpdate:modelValue:v=>t.draft.encryption=v' in patched:
-        raise SystemExit("ERROR: uplink encryption is still manually selectable")
     if 'O.value.encryption=h5000mUplinkSecurity(P.encryption),O.value.password=""' not in patched:
         raise SystemExit("ERROR: scan selection does not set detected security and clear stale password")
 print("PASS: uplink scan security is automatic and unknown encryption cannot be submitted")
