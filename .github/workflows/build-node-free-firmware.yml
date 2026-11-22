@@ -217,6 +217,7 @@ jobs:
             output/frontend-asset-revision.txt
           retention-days: 30
       - name: Publish verified firmware release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: h5000m-complete-repair-node-free
