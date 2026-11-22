@@ -3,7 +3,38 @@ export function mountHigoosWallpaperCrop({upload}) {
   window.__higoosWallpaperCropMounted = true;
   const prefix = "/luci-static/argon/background/";
   const style = document.createElement("style");
-  style.textContent = `.higoos-crop-shade{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:#020617bb;padding:1rem}.higoos-crop-dialog{width:min(900px,96vw);max-height:94vh;overflow:auto;border-radius:.8rem;background:#fff;padding:1rem;color:#0f172a;box-shadow:0 20px 60px #0008}.higoos-crop-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#111827;touch-action:none;cursor:move}.higoos-crop-preview img{position:absolute;max-width:none;user-select:none;pointer-events:none}.higoos-crop-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}.higoos-crop-controls label{display:grid;gap:.25rem;font-size:.9rem}.higoos-crop-actions{display:flex;justify-content:flex-end;gap:.6rem}.higoos-crop-actions button{padding:.55rem .9rem;border-radius:.4rem;border:1px solid #64748b;cursor:pointer}.higoos-crop-status{min-height:1.4em;color:#b91c1c}@media(max-width:600px){.higoos-crop-controls{grid-template-columns:1fr}}`;
+  style.textContent = `.higoos-crop-shade,.higoos-wallpaper-preview-shade{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:#020617bb;padding:1rem}.higoos-crop-dialog,.higoos-wallpaper-preview-dialog{width:min(900px,96vw);max-height:94vh;overflow:auto;border-radius:.8rem;background:#fff;padding:1rem;color:#0f172a;box-shadow:0 20px 60px #0008}.higoos-crop-preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#111827;touch-action:none;cursor:move}.higoos-crop-preview img{position:absolute;max-width:none;user-select:none;pointer-events:none}.higoos-crop-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}.higoos-crop-controls label{display:grid;gap:.25rem;font-size:.9rem}.higoos-crop-actions,.higoos-wallpaper-preview-header{display:flex;justify-content:space-between;align-items:center;gap:.6rem}.higoos-crop-actions button,.higoos-wallpaper-preview-header button{padding:.55rem .9rem;border-radius:.4rem;border:1px solid #64748b;cursor:pointer}.higoos-crop-status{min-height:1.4em;color:#b91c1c}.higoos-wallpaper-preview-image{display:block;width:100%;max-height:75vh;object-fit:contain;margin-top:.75rem;background:#e2e8f0}.higoos-wallpaper-preview-button{display:inline-flex;align-items:center;gap:.45rem;margin-left:.5rem;padding:.15rem .4rem;border:1px solid #94a3b8;border-radius:.35rem;background:#fff;color:#1e293b;cursor:pointer;font-size:.75rem}.higoos-wallpaper-preview-button img{width:2.5rem;height:1.5rem;object-fit:cover;border-radius:.2rem}@media(max-width:600px){.higoos-crop-controls{grid-template-columns:1fr}}`;
+
+  const showPreview = name => {
+    const shade = document.createElement("div");
+    shade.className = "higoos-wallpaper-preview-shade";
+    const dialog = document.createElement("section");
+    dialog.className = "higoos-wallpaper-preview-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    const header = document.createElement("div");
+    header.className = "higoos-wallpaper-preview-header";
+    const title = document.createElement("h2");
+    title.textContent = name;
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.textContent = "关闭";
+    const image = document.createElement("img");
+    image.className = "higoos-wallpaper-preview-image";
+    image.alt = name;
+    image.src = prefix + encodeURIComponent(name);
+    const close = () => { shade.remove(); document.removeEventListener("keydown", onKeyDown); };
+    const onKeyDown = event => { if (event.key === "Escape") close(); };
+    closeButton.addEventListener("click", close);
+    shade.addEventListener("click", event => { if (event.target === shade) close(); });
+    document.addEventListener("keydown", onKeyDown);
+    header.append(title, closeButton);
+    dialog.append(header, image);
+    shade.append(dialog);
+    document.body.append(shade);
+    closeButton.focus();
+  };
+  style.textContent += `.higoos-wallpaper-select-button{margin-left:.4rem;padding:.2rem .45rem;border:1px solid #94a3b8;border-radius:.35rem;background:#fff;color:#1e293b;cursor:pointer;font-size:.75rem}.higoos-wallpaper-select-button[aria-pressed="true"]{border-color:#15803d;color:#166534;background:#f0fdf4}`;
   document.head.append(style);
 
   const showEditor = (name, file = null) => new Promise(resolve => {
@@ -100,5 +131,54 @@ export function mountHigoosWallpaperCrop({upload}) {
     window.addEventListener("resize", resize, {once:true});
   });
   window.higoosCropBeforeUpload = file => /\.(?:jpe?g|png|webp)$/i.test(file.name) ? showEditor(file.name, file) : Promise.resolve(file);
+
+  const addPreviews = () => {
+    document.querySelectorAll("tr").forEach(row => {
+      const cell = row.querySelector("td");
+      if (!cell || row.querySelector(".higoos-wallpaper-preview-button")) return;
+      const name = cell.textContent.trim();
+      if (!/\.(?:jpe?g|png|webp)$/i.test(name) || name.startsWith("higoos-login-wallpaper.")) return;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "higoos-wallpaper-preview-button";
+      button.setAttribute("aria-label", `预览壁纸：${name}`);
+      const thumbnail = document.createElement("img");
+      thumbnail.alt = "";
+      thumbnail.src = prefix + encodeURIComponent(name);
+      const label = document.createElement("span");
+      label.textContent = "预览";
+      button.append(thumbnail, label);
+      button.addEventListener("click", () => showPreview(name));
+      cell.append(button);
+      const select = document.createElement("button");
+      select.type = "button";
+      select.className = "higoos-wallpaper-select-button";
+      select.dataset.wallpaper = name;
+      select.addEventListener("click", () => {
+        try {
+          localStorage.setItem("higoos_argon_login_wallpaper", prefix + encodeURIComponent(name));
+          localStorage.removeItem("higoos_argon_login_wallpaper_source");
+          updateSelectionLabels();
+        } catch {
+          select.textContent = "设置失败";
+        }
+      });
+      cell.append(select);
+    });
+    updateSelectionLabels();
+  };
+  const updateSelectionLabels = () => {
+    let current = "";
+    try { current = localStorage.getItem("higoos_argon_login_wallpaper") || ""; } catch {}
+    document.querySelectorAll(".higoos-wallpaper-select-button").forEach(button => {
+      const selected = current === prefix + encodeURIComponent(button.dataset.wallpaper || "");
+      const label = selected ? "当前登录壁纸" : "设为登录壁纸";
+      if (button.textContent !== label) button.textContent = label;
+      button.setAttribute("aria-pressed", String(selected));
+    });
+  };
+  document.addEventListener("higoos-wallpaper-source-changed", updateSelectionLabels);
+  addPreviews();
+  new MutationObserver(addPreviews).observe(document.body, {childList:true,subtree:true});
 
 }

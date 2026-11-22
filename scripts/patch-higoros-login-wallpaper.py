@@ -16,6 +16,18 @@ if len(login_pages) != 1 or len(native_pages) != 1:
 
 login_path = login_pages[0]
 login = login_path.read_text(encoding="utf-8")
+entry_pages = sorted(assets.glob("index-*.js"))
+if len(entry_pages) != 1:
+    raise SystemExit(f"ERROR: expected one HigoOS SPA entry bundle, found {len(entry_pages)}")
+entry_path = entry_pages[0]
+entry = entry_path.read_text(encoding="utf-8")
+source_import = 'import"./higoos-wallpaper-source.js";'
+if source_import not in entry:
+    entry = source_import + entry
+source_path = assets / "higoos-wallpaper-source.js"
+source_code = Path(__file__).with_name("higoos-wallpaper-source.js").read_text(encoding="utf-8")
+source_path.write_text(source_code, encoding="utf-8")
+entry_path.write_text(entry, encoding="utf-8")
 setup_anchor = 'd=a("root"),c=a(""),b=a(!1)'
 setup_replacement = 'd=a("root"),wallpaper=a(""),c=a(""),b=a(!1)'
 if login.count(setup_anchor) == 1:
@@ -27,7 +39,6 @@ mounted_anchor = 'x.query.changed==="1"&&(m.value=!1,s.value="密码已修改，
 login_probe = (
     '(()=>{const p=[];try{const w=localStorage.getItem("higoos_argon_login_wallpaper");'
     'if(w&&w.startsWith("/luci-static/argon/background/"))p.push(w)}catch{}'
-    'p.push(...["webp","png","jpg","jpeg","gif"].map(e=>"/luci-static/argon/background/higoos-login-wallpaper."+e));'
     'const n=()=>{const w=p.shift();if(!w)return;const image=new Image();image.onload=()=>{try{const c=document.createElement("canvas");'
     'c.width=c.height=1;const x=c.getContext("2d");x.drawImage(image,0,0,1,1);const d=x.getImageData(0,0,1,1).data;'
     'lightWallpaper=(.2126*d[0]+.7152*d[1]+.0722*d[2])>150}catch{lightWallpaper=false}wallpaper.value=w+"?v="+Date.now()};'
@@ -98,16 +109,20 @@ else:
 
 root_anchor = 'i("div",Y,[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
 root_replacement = (
-    'i("div",{...Y,style:wallpaper.value?{backgroundImage:`url("${wallpaper.value}")`,'
-    'backgroundSize:"cover",backgroundPosition:"center"}:void 0},'
+    'i("div",{...Y,style:wallpaper.value?{...Y.style,backgroundImage:`url("${wallpaper.value}")`,'
+    'backgroundSize:"cover",backgroundPosition:"center"}:Y.style},'
     '[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
 )
 if login.count(root_anchor) == 1:
     login = login.replace(root_anchor, root_replacement, 1)
 elif 'backgroundImage:`linear-gradient(rgba(15,23,42,.46),rgba(15,23,42,.62)),url("${wallpaper.value}")`' in login:
     login = login.replace('backgroundImage:`linear-gradient(rgba(15,23,42,.46),rgba(15,23,42,.62)),url("${wallpaper.value}")`', 'backgroundImage:`url("${wallpaper.value}")`', 1)
-elif 'wallpaper.value?{backgroundImage:' not in login:
-    raise SystemExit("ERROR: HigoOS login root element changed")
+elif 'style:wallpaper.value?{...Y.style,backgroundImage:' not in login:
+    old_root = 'i("div",{...Y,style:wallpaper.value?{backgroundImage:`url("${wallpaper.value}")`,backgroundSize:"cover",backgroundPosition:"center"}:void 0},'
+    if old_root in login:
+        login = login.replace(old_root, 'i("div",{...Y,style:wallpaper.value?{...Y.style,backgroundImage:`url("${wallpaper.value}")`,backgroundSize:"cover",backgroundPosition:"center"}:Y.style},', 1)
+    elif 'wallpaper.value?{backgroundImage:' not in login:
+        raise SystemExit("ERROR: HigoOS login root element changed")
 image_anchor = ',[t[11]||(t[11]=e("div",{class:"absolute inset-0 overflow-hidden"}'
 image_replacement = (
     ',[wallpaper.value?i("img",{src:wallpaper.value,alt:"",class:"absolute inset-0 h-full w-full '
@@ -143,9 +158,9 @@ query_watch_replacement = (
     'aliases=files.filter(file=>file.name.startsWith("higoos-login-wallpaper."));try{'
     'if(!images.length){localStorage.removeItem(key);localStorage.removeItem(sourceKey);if(aliases.length){publishing="clear";'
     'try{for(const file of aliases)await o.mutateAsync({name:file.name,revision:file.revision})}finally{publishing=""}}return}'
-    'const current=localStorage.getItem(key),selected=images.find(file=>current===prefix+encodeURIComponent(file.name))'
-    '||images.slice().sort((a,b)=>b.modified-a.modified)[0],extension=selected.name.split(".").pop().toLowerCase(),'
-    'aliasName="higoos-login-wallpaper."+extension;localStorage.setItem(key,prefix+encodeURIComponent(selected.name));'
+    'const current=localStorage.getItem(key),selected=images.find(file=>current===prefix+encodeURIComponent(file.name));'
+    'if(!selected){localStorage.removeItem(sourceKey);return}const extension=selected.name.split(".").pop().toLowerCase(),'
+    'aliasName="higoos-login-wallpaper."+extension;'
     'if(localStorage.getItem(sourceKey)===selected.name&&aliases.some(file=>file.name===aliasName))return;'
     'publishing=selected.name;'
     'for(const file of aliases)await o.mutateAsync({name:file.name,revision:file.revision});'
@@ -179,8 +194,6 @@ upload_anchor = 'try{await l.mutateAsync({file:u.value,revision:c?.revision||s.d
 upload_replacement = (
     'try{const cropped=await window.higoosCropBeforeUpload(u.value);if(!cropped)return;u.value=cropped;const uploadedName=u.value.name;try{localStorage.removeItem("higoos_argon_login_wallpaper_source")}catch{}'
     'await l.mutateAsync({file:u.value,revision:s.data.value.files.find(d=>d.name===uploadedName)?.revision||s.data.value.newRevision});'
-    'try{if(/\\.(?:jpe?g|png|gif|webp)$/i.test(uploadedName))localStorage.setItem('
-    '"higoos_argon_login_wallpaper","/luci-static/argon/background/"+encodeURIComponent(uploadedName));'
     'u.value=null'
 )
 if native.count(upload_anchor) == 1:
@@ -234,12 +247,13 @@ for marker, content in (
     ("new Image()", login),
     ('h5000m-wallpaper-transparent', login),
     ('backgroundImage:`url("${wallpaper.value}")`', login),
-    ("higoos-login-wallpaper.", login),
     ('wallpaper.value?i("img",{src:wallpaper.value', login),
     ("/luci-static/argon/background/", native),
     ('"higoos_argon_login_wallpaper_source"', native),
     ("new File([blob],aliasName", native),
     ("mountHigoosWallpaperCrop({upload:file=>l.mutateAsync", native),
+    ('import"./higoos-wallpaper-source.js";', entry),
+    ("clearUploadedWallpaperOnSourceChange", source_code),
     ("export function mountHigoosWallpaperCrop", crop_source),
     ('files.filter(b=>!b.name.startsWith("higoos-login-wallpaper."))', native),
 ):
