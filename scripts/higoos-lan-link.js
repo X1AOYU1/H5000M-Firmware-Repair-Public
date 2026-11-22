@@ -27,7 +27,7 @@ export function createLanLink(h) {
     render() {
       const d = this.device;
       const wired = d?.isOnline && (d.connectionDetail?.kind === 'wired' || d.connectionType === 'wired');
-      return h('span', { class: 'text-xs text-txt-3', title: wired && this.speed ? '路由器 LAN 口协商速率' : undefined }, wired && this.speed ? this.speed : this.fallback);
+      return h('span', { class: 'text-xs text-txt-3', title: wired && this.speed ? '路由器 LAN 口协商速率' : undefined }, !d?.isOnline ? '—' : wired && this.speed ? this.speed : this.fallback);
     },
   };
 }

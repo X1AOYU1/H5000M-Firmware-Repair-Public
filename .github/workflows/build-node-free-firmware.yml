@@ -54,6 +54,8 @@ jobs:
         run: node tests/higoos-wallpaper-crop-browser.test.mjs
       - name: Test device vendor lookup
         run: node tests/higoos-device-vendor.test.mjs
+      - name: Test wireless presence and topology reconciliation
+        run: node tests/higoos-device-live.test.mjs
       - name: Test OpenClash node cleanup
         run: python3 tests/openclash-cleanup.test.py
       - name: Test OpenClash backup importer
@@ -84,6 +86,10 @@ jobs:
         env:
           PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
         run: node tests/higoros-dashboard-refresh-browser.test.mjs output/final-root/usr/share/higoros/web
+      - name: Test live device state and topology in the packed SPA
+        env:
+          PLAYWRIGHT_ROOT: ${{ runner.temp }}/higoos-ui-audit
+        run: node tests/higoos-device-live-browser.test.mjs output/final-root/usr/share/higoros/web
       - name: Inspect wireless repeater password controls
         run: |
           python3 - <<'PY'
@@ -126,6 +132,8 @@ jobs:
         run: sudo python3 tests/openclash-firmware-restore.test.py output/final-root
       - name: Test authenticated device remarks through LuCI
         run: sudo python3 tests/higoos-device-remarks.test.py output/final-root
+      - name: Test authenticated wireless snapshots through LuCI
+        run: sudo python3 tests/higoos-device-wireless.test.py output/final-root
       - name: Dynamically click OpenClash app-center entry
         id: openclash_browser_audit
         env:
