@@ -79,10 +79,6 @@ try {
   assert.ok(Date.now()-discoveredAt<3500, 'UI renders promptly after backend discovery');
   await page.getByText('-45 dBm(极好)',{exact:true}).waitFor();
   assert.ok((await page.locator('body').innerText()).includes('↓2161 ↑2594 Mbps'));
-  const controlRows = page.locator('.glass-effect [style*="height: 28px"]');
-  assert.equal(await controlRows.count(), 2, 'each device reserves the same controls row');
-  const rowMetrics = await controlRows.evaluateAll(rows => rows.map(row => ({height:Math.round(row.getBoundingClientRect().height)})));
-  assert.deepEqual(rowMetrics.map(row=>row.height),[28,28],'the controls row has a stable height');
   stage='offline';
   const since=Date.now();
   await page.waitForFunction(()=>!document.body.innerText.includes('-45 dBm'),{},{timeout:6500});

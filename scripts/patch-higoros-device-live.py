@@ -44,23 +44,11 @@ def patch(root):
         'const h5000mDeviceHistory=createDeviceHistory({defineComponent:Z,h:Be,ref:M,Modal:N,Button:V});const h5000mDeviceRemark=createDeviceRemark(')
     card = 'r(h5000mDeviceRemark,{mac:t.macAddress,name:t.name},null,8,["mac","name"])'
     history = 'r(h5000mDeviceHistory,{device:t},null,8,["device"])'
-    outer_card = 'class:n(["relative overflow-hidden p-4 rounded-xl glass-effect",v.value])'
-    outer_card_flex = outer_card + ',style:{position:"relative",alignSelf:"stretch",display:"flex",flexDirection:"column"}'
-    if outer_card_flex not in body:
-        body = replace(body, outer_card, outer_card_flex)
-    inner_card = 'Vs={class:"relative z-10"}'
-    inner_card_flex = 'Vs={class:"relative z-10",style:{zIndex:10,display:"flex",flex:"1 1 auto",flexDirection:"column",paddingBottom:"2rem"}}'
-    if inner_card_flex not in body:
-        body = replace(body, inner_card, inner_card_flex)
-    controls = ('e("div",{class:"flex min-w-0 items-center justify-between gap-2 overflow-hidden",'
-                'style:{position:"absolute",zIndex:20,left:"0",right:"0",bottom:"0",height:"28px",minHeight:"28px",maxHeight:"28px",boxSizing:"border-box"}},[' + card + ',' + history + '])')
+    controls = 'e("div",{class:"mt-1 flex h-7 min-w-0 items-center justify-between gap-2 overflow-hidden"},[' + card + ',' + history + '])'
     if controls not in body:
         siblings = card + ',' + history
         if siblings in body:
             body = body.replace(siblings, controls, 1)
-        elif 'e("div",{class:"mt-1 flex h-7 min-w-0 items-center justify-between gap-2 overflow-hidden"},[' + card + ',' + history + '])' in body:
-            old_controls = 'e("div",{class:"mt-1 flex h-7 min-w-0 items-center justify-between gap-2 overflow-hidden"},[' + card + ',' + history + '])'
-            body = body.replace(old_controls, controls, 1)
         else:
             body = replace(body, card, controls)
     if 'import{createDeviceHistory}' not in body:
